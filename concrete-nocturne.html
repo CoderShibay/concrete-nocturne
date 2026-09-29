@@ -314,7 +314,13 @@ const glowMat = (color, opacity) => new THREE.MeshBasicMaterial({ map: glowTex, 
 const mats = {
   win0: windowMaterial(0, 11), win1: windowMaterial(1, 23), win2: windowMaterial(2, 37), win3: windowMaterial(3, 51), win4: windowMaterial(0, 67, 0.06),
   vend: new THREE.MeshBasicMaterial({ color: 0xa8e4ff }),
-  bridge: new THREE.MeshBasicMaterial({ color: 0x74866f }),
+  bridge: new THREE.MeshBasicMaterial({ color: 0x8fa688 }),
+  bridgeDim: new THREE.MeshBasicMaterial({ color: 0x1f261e }),
+  warmwin: new THREE.MeshBasicMaterial({ color: 0xffd49a }),
+  fluo: new THREE.MeshBasicMaterial({ color: 0xd6ecd0 }),
+  diner: new THREE.MeshBasicMaterial({ color: 0x5f8a68 }),
+  shelter: new THREE.MeshBasicMaterial({ color: 0xbcd6e4 }),
+  dark: new THREE.MeshBasicMaterial({ color: 0x07070a }),
   glowc: glowMat(0x7fd8ff, 0.35),
   concrete: concreteMaterial(),
   roof: new THREE.MeshStandardMaterial({ color: 0x1b1b1e, roughness: 1 }),
@@ -323,6 +329,7 @@ const mats = {
   lampv: new THREE.MeshBasicMaterial({ color: 0xcdeed4 }),
   glow: glowMat(0xff8a2a, 0.72),
   glowv: glowMat(0x7fcf9a, 0.32),
+  glowd: glowMat(0x8fe0a4, 0.6),
   beacon: new THREE.MeshBasicMaterial({ color: 0xff2040 }),
 };
 NEON.forEach((c, k) => { mats['neon' + k] = new THREE.MeshBasicMaterial({ color: c }); });
@@ -402,7 +409,11 @@ const ZONE_NAMES = {
   corner: ['The All-Night Corner', 'Where the Diner Was', 'Last Counter', 'Payphone Street'],
   fog: ['Where It Thins Out', 'The Last Lamps', 'Low Tide', 'Edge of the Grid'],
 };
-const director = { distanceDriven: 0, driveTime: 0, sinceLastMoment: 0, litFraction: 1, musicDensity: 1 };
+const director = { distanceDriven: 0, driveTime: 0, sinceLastMoment: 0, nextGap: 25, litFraction: 1, musicDensity: 1 };
+// Moments: one small sign of other people at a time, 30–50 s apart (the rhythm). A moment is placed in the block
+// that is about to appear ahead of the car; it only counts once the car has actually passed it.
+const moments = { pending: false, active: null, cache: new Map(), lingering: [] };
+const MOMENT_FOR = { corridor: 'bridge', boulevard: 'window', plaza: 'lamp', interchange: 'train', residential: 'silhouette', corner: 'diner', fog: 'lampsOff' };
 const districtZones = new Map();          // "di,dj" → zone, so returning to a district shows the same thing
 const districtOf = v => Math.floor(v / 3);
 function zoneFor(di, dj) {
@@ -441,6 +452,9 @@ function genCell(i, j) {
   const rnd = mulberry(hash2(i, j, 7)), zr = mulberry(hash2(di, dj, 13));    // zr gives every block in a district the same numbers
   const bk = {}, grp = new THREE.Group(), geos = [], signMats = [], flick = [];
   grp.position.set(i * C, 0, j * C);
+  const mom = moments.cache.get(i + ',' + j), extras = [], ticks = [];   // this block's moment, if the director gave it one
+  let momentPos = null;
+  if (mom) mom.generated = true;
   const L = B - A, mid = (A + B) / 2;
   const win = () => rnd() < 0.35 ? 'win4' : 'win' + Math.floor(rnd() * 4);
   const neon = () => 'neon' + Math.floor(rnd() * NEON.length);
@@ -462,7 +476,9 @@ function genCell(i, j) {
     const alongX = zr() < 0.5, key = zr() < 0.5 ? 'win0' : 'win1', h = 160 + zr() * 60, b1 = 3 + h * (0.22 + zr() * 0.1), b2 = b1 + 30 + zr() * 20;
     const sw = 14, sl = L - 4, gap = L - 2 - 2 * sw;
     for (const a of [A + 1 + sw / 2, B - 1 - sw / 2]) tower(key, alongX ? sw : sl, h, alongX ? sl : sw, alongX ? a : mid, alongX ? mid : a, ph, same);
-    for (const by of [b1, b2]) addBox(bk, 'bridge', 'roof', alongX ? gap + 2 : 9, 4.5, alongX ? 9 : gap + 2, mid, by, mid); // P11: lit links nobody uses
+    const litBridge = mom && mom.type === 'bridge';
+    [b1, b2].forEach((by, n) => addBox(bk, litBridge && n === 0 ? 'bridge' : 'bridgeDim', 'roof', alongX ? gap + 2 : 9, 4.5, alongX ? 9 : gap + 2, mid, by, mid)); // P11: links nobody uses
+    if (litBridge) momentPos = new THREE.Vector3(i * C + mid, b1, j * C + mid);
     lampOn = 0.75;
   } else if (zone === 'boulevard') {
     // P1 + P2: an open forecourt; the tower stands far back from every road, so the street reads far wider
@@ -589,21 +605,267 @@ function genCell(i, j) {
 
   // street lamps with sodium light pools on the road; how many still work depends on the zone
   const violet = rnd() < 0.08, lk = violet ? 'lampv' : 'lamp', gk = violet ? 'glowv' : 'glow';
+  const solo = mom && mom.type === 'lampsOff' ? [] : null;
+  if (solo) lampOn = 1;
   const lamp = (x, z, dx, dz) => {
     addBox(bk, 'pole', 'pole', 0.25, 7.5, 0.25, x, 3.75, z);
     addBox(bk, 'pole', 'pole', dx ? 2.4 : 0.2, 0.2, dz ? 2.4 : 0.2, x + dx * 1.2, 7.5, z + dz * 1.2);
+    if (solo) {
+      const hg = new THREE.BoxGeometry(dx ? 1.4 : 0.5, 0.22, dz ? 1.4 : 0.5), pg = new THREE.PlaneGeometry(22, 22);
+      const hm = mats[lk].clone(), pm = mats[gk].clone();
+      const head = new THREE.Mesh(hg, hm); head.position.set(x + dx * 2.2, 7.35, z + dz * 2.2);
+      const pool = new THREE.Mesh(pg, pm); pool.rotation.x = -Math.PI / 2; pool.position.set(x + dx * 4, 0.05, z + dz * 4); pool.renderOrder = 1;
+      grp.add(head, pool); extras.push(hg, pg, hm, pm);
+      solo.push({ head, pool, wx: i * C + x + dx * 2.2, wz: j * C + z + dz * 2.2, off: false });
+      return;
+    }
     const on = rnd() < lampOn;
     addBox(bk, on ? lk : 'pole', on ? lk : 'pole', dx ? 1.4 : 0.5, 0.22, dz ? 1.4 : 0.5, x + dx * 2.2, 7.35, z + dz * 2.2);
     if (on) addFlat(bk, gk, x + dx * 4, z + dz * 4, 22, 0.05);
   };
   for (const q of [R + 10, R + 36, R + 62]) { lamp(R + 0.8, q, -1, 0); lamp(q, R + 0.8, 0, -1); }
 
+  if (mom) momentPos = buildMoment(mom, { i, j, bk, grp, rnd, ph, mid, facades, extras, ticks, solo }) || momentPos;
+
   flush(bk, grp, geos);
   scene.add(grp);
-  return { grp, geos, signMats, flick, zone };
+  return { grp, geos, signMats, flick, zone, extras, momentPos, tick: ticks.length ? (dt, t) => ticks.forEach(f => f(dt, t)) : null };
 }
 function disposeCell(c) {
-  scene.remove(c.grp); c.geos.forEach(g => g.dispose()); c.signMats.forEach(m => m.dispose());
+  scene.remove(c.grp); c.geos.forEach(g => g.dispose()); c.signMats.forEach(m => m.dispose()); c.extras.forEach(x => x.dispose());
+}
+
+/* ---------- moments: small signs of other people, never for you ---------- */
+const figureTex = (() => {   // a person seen from far away: head, shoulders, body
+  const c = mkCanvas(64, 128), x = c.getContext('2d');
+  x.fillStyle = '#000'; x.beginPath(); x.arc(32, 24, 11, 0, 7); x.fill();
+  x.beginPath(); x.moveTo(13, 128); x.lineTo(15, 54); x.quadraticCurveTo(32, 38, 49, 54); x.lineTo(51, 128); x.fill();
+  return new THREE.CanvasTexture(c);
+})();
+const _v = new THREE.Vector3(), _w = new THREE.Vector3();
+function panFor(wx, wz) { // -1 left … +1 right, relative to where the car is facing
+  const rx = Math.cos(car.heading), rz = -Math.sin(car.heading);
+  return clamp(((wx - car.pos.x) * rx + (wz - car.pos.z) * rz) / 25, -1, 1);
+}
+// Builds a moment into its block. u runs along the road the car arrived on; o is the distance out from the lot
+// edge toward that road (negative = into the lot). Side 0 is the lot's -x edge, side 2 its -z edge.
+function buildMoment(m, c) {
+  const { i, j, bk, grp, rnd, ph, mid, facades, extras, ticks } = c, S = m.side;
+  const at = (u, o, y) => S === 0 ? [A - o, y, u] : [u, y, A - o];
+  const blk = (key, along, h, out, u, o, y) => { const [x, yy, z] = at(u, o, y); if (S === 0) addBox(bk, key, key, out, h, along, x, yy, z); else addBox(bk, key, key, along, h, out, x, yy, z); };
+  const flat = (key, u, o, size, y) => { const [x, yy, z] = at(u, o, y); addFlat(bk, key, x, z, size, yy); };
+  const world = (u, o, y) => { const [x, yy, z] = at(u, o, y); return new THREE.Vector3(i * C + x, yy, j * C + z); };
+  const facing = S === 0 ? -Math.PI / 2 : Math.PI;
+  const plane = (mat, w, h, u, o, y) => {
+    const g = new THREE.PlaneGeometry(w, h), mesh = new THREE.Mesh(g, mat); const [x, yy, z] = at(u, o, y);
+    mesh.position.set(x, yy, z); mesh.rotation.y = facing; grp.add(mesh); extras.push(g); return mesh;
+  };
+  const frontFacade = () => facades.reduce((best, f) => (S === 0 ? f.x0 < best.x0 : f.z0 < best.z0) ? f : best, facades[0]);
+
+  if (m.type === 'window') {
+    // moment 2 (P3): one lit window very high on a dark tower. It goes out while you are looking at it.
+    const f = frontFacade(); if (!f) return null;
+    const o = -((S === 0 ? f.x0 : f.z0) - A) + 0.06, u = (S === 0 ? (f.z0 + f.z1) / 2 : (f.x0 + f.x1) / 2) + (rnd() - 0.5) * 10;
+    const mat = mats.warmwin.clone(); extras.push(mat);
+    const win = plane(mat, 2.6, 2.0, u, o, ph + 58 + rnd() * 10);
+    const wp = world(u, o, win.position.y); let seen = 0;
+    ticks.push(dt => {
+      if (!win.visible) return;
+      camera.getWorldDirection(_v); _w.copy(wp).sub(camera.position);
+      const dist = _w.length(); _w.normalize();
+      if (dist < 170 && _v.dot(_w) > 0.9) seen += dt;
+      if (seen > 1.4) win.visible = false;             // the light switches off the moment you look at it
+    });
+    return wp;
+  }
+  if (m.type === 'lamp') {
+    // moment 3 (P2, P10): one lamp in the empty square, a bench with armrests under it,
+    // and a figure-sized statue whose long shadow runs across the plaza (de Chirico)
+    const u0 = A + 12;
+    blk('pole', 0.3, 9, 0.3, u0, -14, ph + 4.5); blk('lamp', 0.8, 0.25, 0.8, u0, -14, ph + 9);
+    flat('glow', u0, -14, 28, ph + 0.04);
+    blk('pole', 2.6, 0.1, 0.5, u0 + 2.6, -14, ph + 0.45);
+    for (const du of [1.4, 2.6, 3.8]) blk('pole', 0.07, 0.32, 0.5, u0 + du, -14, ph + 0.62);
+    blk('concrete', 1.4, 1.2, 1.4, u0, -22, ph + 0.6); blk('roof', 0.5, 2.3, 0.4, u0, -22, ph + 2.35);
+    const sg = S === 0 ? new THREE.PlaneGeometry(36, 1.1) : new THREE.PlaneGeometry(1.1, 36);
+    const sm = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+    const shadow = new THREE.Mesh(sg, sm); const [x, , z] = at(u0, -41, 0);
+    shadow.rotation.x = -Math.PI / 2; shadow.position.set(x, ph + 0.03, z); grp.add(shadow); extras.push(sg, sm);
+    return world(u0, -14, 0);
+  }
+  if (m.type === 'silhouette') {
+    // moment 5 (P3, P4): a lit window in the housing wall, a figure crossing it who never looks out;
+    // below, a lit bus stop in the rain with nobody waiting
+    const f = frontFacade();
+    if (f) {
+      const o = -((S === 0 ? f.x0 : f.z0) - A) + 0.06, u = S === 0 ? (f.z0 + f.z1) / 2 : (f.x0 + f.x1) / 2, y = ph + 20;
+      blk('warmwin', 3.4, 2.4, 0.05, u, o - 0.03, y);
+      const fm = new THREE.MeshBasicMaterial({ map: figureTex, color: 0x000000, alphaTest: 0.5 }); extras.push(fm);
+      const fig = plane(fm, 1.0, 2.0, u, o + 0.02, y - 0.3);
+      let ph2 = rnd() * 10;
+      ticks.push(dt => {
+        ph2 = (ph2 + dt) % 10;
+        fig.visible = ph2 < 4.5;
+        const off = -2.2 + 4.4 * (ph2 / 4.5), [x, , z] = at(u + off, o + 0.02, 0);
+        fig.position.x = x; fig.position.z = z;
+      });
+    }
+    const ub = A + 22;
+    blk('roof', 5, 0.15, 1.8, ub, 1.9, 2.55); blk('fluo', 4.6, 0.04, 0.25, ub, 1.9, 2.46);
+    blk('pole', 5, 2.4, 0.08, ub, 1.0, 1.25); blk('shelter', 0.1, 1.8, 1.4, ub + 2.5, 1.9, 1.3);
+    blk('pole', 2.6, 0.1, 0.45, ub - 0.3, 1.4, 0.46);
+    for (const du of [-1.4, -0.3, 0.8]) blk('pole', 0.07, 0.3, 0.45, ub + du, 1.4, 0.62);
+    blk('pole', 0.1, 2.8, 0.1, ub - 3.2, 3.2, 1.4); blk('fluo', 0.5, 0.5, 0.06, ub - 3.2, 3.2, 2.7);
+    flat('glowc', ub, 3, 10, 0.06);
+    return world(ub, 2, 0);
+  }
+  if (m.type === 'diner') {
+    // moment 6 (P3, P6): a narrow all-night diner in Hopper green, one figure at the counter with their back to
+    // the road. Next to it a payphone that starts ringing as you come near, for someone who isn't there.
+    const u0 = A + 40, u1 = A + 52, um = A + 46;
+    blk('roof', 12, 0.15, 3.4, um, 2.0, 0.075); blk('diner', 12, 3.2, 0.15, um, 0.35, 1.6);
+    blk('diner', 0.15, 3.2, 3.4, u0, 2.0, 1.6); blk('diner', 0.15, 3.2, 3.4, u1, 2.0, 1.6);
+    blk('roof', 12.4, 0.3, 3.8, um, 2.0, 3.35); blk('fluo', 10, 0.05, 0.3, um, 2.0, 3.15);
+    blk('roof', 9, 1.0, 0.6, um, 1.1, 0.5); blk('warmwin', 9, 0.04, 0.62, um, 1.1, 1.02);
+    for (let k = 0; k < 4; k++) blk('pole', 0.35, 0.75, 0.35, u0 + 2.5 + k * 2.2, 2.0, 0.375);
+    for (let u = u0; u <= u1 + 0.01; u += 3) blk('pole', 0.08, 3.2, 0.08, u, 3.65, 1.6);
+    const us = u0 + 6.9;
+    blk('dark', 0.42, 0.7, 0.32, us, 2.05, 1.1);
+    const hg = new THREE.SphereGeometry(0.13, 12, 8), head = new THREE.Mesh(hg, mats.dark); const [hx, hy, hz] = at(us, 2.05, 1.62);
+    head.position.set(hx, hy, hz); grp.add(head); extras.push(hg);
+    flat('glowd', um, 5.5, 18, 0.05);                                      // green light spilling onto the wet road
+    const up = A + 37;
+    blk('pole', 0.12, 2.1, 0.12, up, 1.2, 1.05); blk('roof', 0.9, 1.0, 0.5, up, 1.2, 1.75); blk('fluo', 0.5, 0.25, 0.05, up, 1.47, 2.0);
+    const pp = world(up, 1.2, 0); let nextRing = 0, rung = 0, done = false;
+    ticks.push((dt, t) => {
+      if (done) return;
+      const d = Math.hypot(pp.x - car.pos.x, pp.z - car.pos.z);
+      if (d < 65 && t > nextRing) { radio.ring(panFor(pp.x, pp.z)); nextRing = t + 3.4; rung++; }
+      if (rung && (d > 90 || rung > 6)) done = true;   // it stops once you've gone, nobody answered
+    });
+    return world(um, 2, 0);
+  }
+  if (m.type === 'lampsOff' && c.solo) {
+    // moment 7 (P7, P12): the lamps go out one by one just after you pass under them
+    ticks.push(() => {
+      const vl = car.vel.length(); if (vl < 2) return;
+      for (const l of c.solo) {
+        if (l.off) continue;
+        const rx = l.wx - car.pos.x, rz = l.wz - car.pos.z, along = (rx * car.vel.x + rz * car.vel.z) / vl;
+        if (along < -3 && Math.hypot(rx, rz) < 40) { l.off = true; l.head.material.color.setHex(0x141416); l.pool.visible = false; radio.click(panFor(l.wx, l.wz)); }
+      }
+    });
+    return new THREE.Vector3(i * C + mid, 0, j * C + mid);
+  }
+  return null;
+}
+
+// Moments that aren't part of a block: tail lights far ahead that switch off, a lit train on a high line.
+function makeTaillights(alongZ, s) {
+  const g = new THREE.Group(), red = new THREE.MeshBasicMaterial({ color: 0xff2030 }), body = new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 0.6 });
+  const lg = new THREE.BoxGeometry(0.4, 0.12, 0.05), bg = new THREE.BoxGeometry(1.9, 0.7, 4.4);
+  for (const x of [-0.7, 0.7]) { const m = new THREE.Mesh(lg, red); m.position.set(x, 0.8, 2.22); g.add(m); }
+  const b = new THREE.Mesh(bg, body); b.position.y = 0.6; g.add(b);
+  const dir = alongZ ? new THREE.Vector3(0, 0, s) : new THREE.Vector3(s, 0, 0);
+  g.rotation.y = Math.atan2(-dir.x, -dir.z);
+  const pos = car.pos.clone().addScaledVector(dir, 170); pos.y = 0; g.position.copy(pos); scene.add(g);
+  let age = 0, off = -1; const offAt = 6 + Math.random() * 3;
+  return {
+    pos,
+    tick(dt) {
+      age += dt; pos.addScaledVector(dir, Math.max(20, Math.abs(car.speed) * 0.85) * dt); g.position.copy(pos);
+      const gap = (pos.x - car.pos.x) * dir.x + (pos.z - car.pos.z) * dir.z;
+      if (off < 0 && (gap < 80 || age > offAt)) { off = age; red.color.setHex(0x120404); }   // someone else, then no one
+      if (off >= 0 && age - off > 1.5) { g.visible = false; return 'used'; }
+      if (gap > 420 || gap < -60) return 'gone';
+    },
+    dispose() { scene.remove(g); red.dispose(); body.dispose(); lg.dispose(); bg.dispose(); },
+  };
+}
+function makeTrain(alongZ, s, ti, tj) {
+  // moment 4 (P9): a lit, empty train crosses a high line ahead, then its horn
+  const g = new THREE.Group(), geos = [], body = new THREE.MeshStandardMaterial({ color: 0x24262a, roughness: 0.5, metalness: 0.4 });
+  const line = alongZ ? tj * C + A + 30 : ti * C + A + 30;           // runs across the lots, never along a road
+  const base = alongZ ? Math.floor(car.pos.x / C) : Math.floor(car.pos.z / C);
+  const put = (geo, mat, a, y, b2) => { const m = new THREE.Mesh(geo, mat); if (alongZ) m.position.set(a, y, b2); else m.position.set(b2, y, a); g.add(m); geos.push(geo); return m; };
+  const box = (len, h, w) => alongZ ? new THREE.BoxGeometry(len, h, w) : new THREE.BoxGeometry(w, h, len);
+  put(box(1000, 1.6, 5), mats.concrete, base * C, 30, line);
+  for (let k = -5; k <= 5; k++) put(box(2.4, 29, 2.4), mats.concrete, (base + k) * C + A + 30, 14.5, line);
+  const tr = new THREE.Group(); g.add(tr);
+  const cars = 7, cl = 18;
+  for (let k = 0; k < cars; k++) {
+    const bgeo = box(cl, 3.2, 3), wgeo = box(cl - 1.5, 1.0, 3.08); geos.push(bgeo, wgeo);
+    const bm = new THREE.Mesh(bgeo, body), wm = new THREE.Mesh(wgeo, mats.warmwin);
+    const a = -k * (cl + 1);
+    if (alongZ) { bm.position.set(a, 32.4, line); wm.position.set(a, 32.7, line); } else { bm.position.set(line, 32.4, a); wm.position.set(line, 32.7, a); }
+    tr.add(bm, wm);
+  }
+  scene.add(g);
+  const dirT = Math.random() < 0.5 ? 1 : -1, carAlong = () => alongZ ? car.pos.x : car.pos.z, SPEED = 40;
+  const toLine = Math.abs((alongZ ? car.pos.z : car.pos.x) - line), arrive = toLine / Math.max(12, Math.abs(car.speed));
+  let front = carAlong() - dirT * clamp(SPEED * arrive * 0.7 + 40, 120, 460), horned = false;
+  const pos = alongZ ? new THREE.Vector3(car.pos.x, 30, line) : new THREE.Vector3(line, 30, car.pos.z);
+  tr.scale.set(alongZ ? dirT : 1, 1, alongZ ? 1 : dirT);
+  return {
+    pos, lingerLine: line, alongZ,
+    tick(dt) {
+      front += dirT * SPEED * dt;
+      if (alongZ) tr.position.x = front; else tr.position.z = front;
+      if (!horned && Math.abs(front - carAlong()) < 150) { horned = true; radio.trainHorn(); }
+      if ((front - carAlong()) * dirT > 460 + cars * (cl + 1)) { tr.visible = false; return 'used'; }
+      const off = Math.abs((alongZ ? car.pos.z : car.pos.x) - line);
+      if (off > 900) return horned ? 'used' : 'gone';
+    },
+    far() { return Math.abs((alongZ ? car.pos.z : car.pos.x) - line) > 450; },
+    dispose() { scene.remove(g); body.dispose(); geos.forEach(x => x.dispose()); },
+  };
+}
+
+// Called when the car enters a new block: if a moment is due, give it to the block that is about to appear ahead.
+function placeMoment(ci, cj) {
+  if (!moments.pending || !started) return;
+  const v = car.vel; if (v.lengthSq() < 9) return;
+  const alongZ = Math.abs(v.z) > Math.abs(v.x), s = Math.sign(alongZ ? v.z : v.x);
+  const ti = alongZ ? ci : ci + s * VIEW, tj = alongZ ? cj + s * VIEW : cj, key = ti + ',' + tj;
+  if (cells.has(key) || moments.cache.has(key)) return;
+  const zone = zoneFor(districtOf(ti), districtOf(tj)), li = ti - districtOf(ti) * 3, lj = tj - districtOf(tj) * 3;
+  let type = MOMENT_FOR[zone];
+  if (type === 'window' && (li + lj) % 2) type = 'taillights';            // no tower on this block of the boulevard
+  if (type === 'bridge' && Math.random() < 0.35) type = 'taillights';
+  const m = { type, side: alongZ ? 0 : 2, key };
+  moments.pending = false;
+  if (type === 'taillights') m.global = makeTaillights(alongZ, s);
+  else if (type === 'train') m.global = makeTrain(alongZ, s, ti, tj);
+  else moments.cache.set(key, m);
+  moments.active = m;
+}
+function momentDone(used) {
+  const a = moments.active; moments.active = null;
+  if (a && a.global) { if (a.global.far && !a.global.far()) moments.lingering.push(a.global); else a.global.dispose(); }
+  if (used) { director.sinceLastMoment = 0; director.nextGap = 30 + Math.random() * 20; }
+  else moments.pending = true;                                             // turned away: it will be placed ahead again
+}
+function momentsTick(dt, t) {
+  for (let k = moments.lingering.length - 1; k >= 0; k--) if (moments.lingering[k].far()) { moments.lingering[k].dispose(); moments.lingering.splice(k, 1); }
+  const a = moments.active;
+  if (!a) { if (!moments.pending && director.sinceLastMoment > director.nextGap) moments.pending = true; return; }
+  let pos;
+  if (a.global) {
+    const st = a.global.tick(dt);
+    if (st === 'used') return momentDone(true);
+    if (st === 'gone') return momentDone(false);
+    return;
+  }
+  const c = cells.get(a.key);
+  if (!c) {
+    if (!a.generated) return;                                              // still waiting in the build queue
+    if (!a.near) moments.cache.delete(a.key);
+    return momentDone(!!a.near);
+  }
+  pos = c.momentPos;
+  if (!pos) { moments.cache.delete(a.key); return momentDone(false); }       // nothing to anchor it to here; try again ahead
+  const d = Math.hypot(pos.x - car.pos.x, pos.z - car.pos.z);
+  if (d < 55) a.near = true; else if (a.near && d > 80) momentDone(true);
 }
 
 /* ---------- ground ---------- */
@@ -1166,6 +1428,27 @@ const radio = {
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.025 * v, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
     s.connect(f); f.connect(g); if (p) { p.pan.value = pan; g.connect(p); p.connect(this.comp); } else g.connect(this.comp); s.start(t, Math.random()); s.stop(t + 0.45);
   },
+  ring(pan) { // an old payphone bell: two tones, trilling, two bursts
+    if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime, out = ctx.createGain(), lp = ctx.createBiquadFilter();
+    const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null; lp.type = 'lowpass'; lp.frequency.value = 2600; out.gain.value = 0;
+    out.connect(lp); if (p) { p.pan.value = pan; lp.connect(p); p.connect(this.comp); p.connect(this.rev); } else { lp.connect(this.comp); lp.connect(this.rev); }
+    for (const f of [440, 480]) { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(out); o.start(t); o.stop(t + 1.3); }
+    for (const [a, b] of [[0, 0.45], [0.65, 1.1]]) for (let k = t + a; k < t + b; k += 0.05) { out.gain.setValueAtTime(0.028, k); out.gain.setValueAtTime(0, k + 0.025); }
+  },
+  click(pan) { // a relay somewhere as a lamp goes out
+    if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime, s2 = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    s2.buffer = this.noise; f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 3;
+    g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    s2.connect(f); f.connect(g); if (p) { p.pan.value = pan; g.connect(p); p.connect(this.comp); p.connect(this.rev); } else g.connect(this.comp);
+    s2.start(t, Math.random()); s2.stop(t + 0.06);
+  },
+  trainHorn() { // closer than the distant one: the lit train crossing ahead
+    if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime, out = ctx.createGain(), lp = ctx.createBiquadFilter(), dur = 3.6;
+    lp.type = 'lowpass'; lp.frequency.value = 1300; out.connect(lp); lp.connect(this.comp); lp.connect(this.rev);
+    for (const f of [277, 330, 415]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = Math.random() * 10 - 5; o.connect(out); o.start(t); o.stop(t + dur); }
+    out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(0.014, t + 0.4); out.gain.setValueAtTime(0.014, t + 2.4); out.gain.linearRampToValueAtTime(0, t + dur);
+  },
   thump(v) {
     if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
     o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.2);
@@ -1234,6 +1517,7 @@ function updateCells() {
   }
   queue.sort((a, b) => a[2] - b[2]);
   ground.position.set(ci * C, 0, cj * C);
+  placeMoment(ci, cj);
 }
 function pumpCells(n) {
   while (queue.length && n-- > 0) {
@@ -1412,7 +1696,7 @@ let elapsed = 0, hudTick = 0;
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.05); elapsed += dt;
-  if (started) { drive(dt); directorTick(dt); }
+  if (started) { drive(dt); directorTick(dt); momentsTick(dt, elapsed); }
   NIGHT.value = director.litFraction;
   updateCells(); pumpCells(started ? 2 : 4);
 
@@ -1475,6 +1759,7 @@ function frame() {
   }
   const blink = Math.sin(elapsed * 2.2) > 0.55 ? 1 : 0.12;
   mats.beacon.color.setRGB(blink, blink * 0.12, blink * 0.25);
+  for (const cell of cells.values()) if (cell.tick) cell.tick(dt, elapsed);
   for (const cell of cells.values()) for (const f of cell.flick) {
     const s = Math.sin(elapsed * 1.3 + f.seed);
     f.m.color.setScalar(s > 0.92 && Math.random() < 0.5 ? 0.2 : 1);
