@@ -426,7 +426,9 @@ function genCell(i, j) {
   const same = () => 0;                                                        // fixed window offset: identical facades
   const facades = [], roofs = [];
   const tower = (key, w, h, d, x, z, base, uv = rnd) => {
-    addBox(bk, key, 'roof', w, h, d, x, base + h / 2, z, uv);
+    const blank = Math.min(14, h * 0.12);                                      // P5: a windowless base, nothing to look at from the road
+    addBox(bk, 'concrete', 'concrete', w, blank, d, x, base + blank / 2, z);
+    addBox(bk, key, 'roof', w, h - blank, d, x, base + blank + (h - blank) / 2, z, uv);
     facades.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, y0: base, y1: base + h });
     roofs.push({ x, z, w, d, y: base + h });
   };
@@ -436,22 +438,22 @@ function genCell(i, j) {
   if (zone === 'corridor') {
     // P5 + P11: the same twin slabs block after block, one lit sky bridge between them that nobody crosses
     plinth(3);
-    const alongX = zr() < 0.5, key = zr() < 0.5 ? 'win0' : 'win1', h = 70 + zr() * 40, bridgeY = 3 + h * (0.35 + zr() * 0.3);
+    const alongX = zr() < 0.5, key = zr() < 0.5 ? 'win0' : 'win1', h = 160 + zr() * 60, b1 = 3 + h * (0.22 + zr() * 0.1), b2 = b1 + 30 + zr() * 20;
     const sw = 14, sl = L - 4, gap = L - 2 - 2 * sw;
     for (const a of [A + 1 + sw / 2, B - 1 - sw / 2]) tower(key, alongX ? sw : sl, h, alongX ? sl : sw, alongX ? a : mid, alongX ? mid : a, ph, same);
-    addBox(bk, 'bridge', 'roof', alongX ? gap + 2 : 9, 4.5, alongX ? 9 : gap + 2, mid, bridgeY, mid);
+    for (const by of [b1, b2]) addBox(bk, 'bridge', 'roof', alongX ? gap + 2 : 9, 4.5, alongX ? 9 : gap + 2, mid, by, mid); // P11: lit links nobody uses
     lampOn = 0.75;
   } else if (zone === 'boulevard') {
     // P1 + P2: an open forecourt; the tower stands far back from every road, so the street reads far wider
     plinth(0.4);
-    tower(win(), 24 + rnd() * 10, 110 + rnd() * 70, 24 + rnd() * 10, mid, mid, ph);
+    if ((li + lj) % 2 === 0) tower(win(), 30 + rnd() * 8, 260 + rnd() * 120, 30 + rnd() * 8, mid, mid, ph); // P1: fewer, bigger masses
     lampOn = 0.85;
   } else if (zone === 'plaza') {
     // P2: the square is empty ground; one monument in the middle block, one lamp beside it
     plinth(0.3);
     if (li === 1 && lj === 1) {
-      addBox(bk, 'concrete', 'roof', 16, 3, 16, mid, ph + 1.5, mid);
-      addBox(bk, 'concrete', 'roof', 9, 64, 9, mid, ph + 3 + 32, mid);
+      addBox(bk, 'concrete', 'roof', 22, 3, 22, mid, ph + 1.5, mid);
+      addBox(bk, 'concrete', 'roof', 12, 150, 12, mid, ph + 3 + 75, mid);   // P1: its top is lost in the haze
       addBox(bk, 'pole', 'pole', 0.3, 9, 0.3, mid + 14, ph + 4.5, mid + 14);
       addBox(bk, 'lamp', 'lamp', 0.7, 0.25, 0.7, mid + 14, ph + 9, mid + 14);
       addFlat(bk, 'glow', mid + 14, mid + 14, 22, ph + 0.03);
@@ -468,10 +470,10 @@ function genCell(i, j) {
   } else if (zone === 'residential') {
     // P3 (first pass): a wall of housing slabs, most of their windows dark
     plinth(2.5);
-    const alongX = rnd() < 0.5, n = 3, sw = 12, gap = (L - 2 - n * sw) / (n - 1);
+    const alongX = rnd() < 0.5, n = 3, sw = 12, gap = (L - 2 - n * sw) / (n - 1), hb = 130 + rnd() * 50;
     for (let k = 0; k < n; k++) {
       const a = A + 1 + sw / 2 + k * (sw + gap), key = rnd() < 0.55 ? 'win4' : 'win0';
-      tower(key, alongX ? sw : L - 6, 60 + rnd() * 45, alongX ? L - 6 : sw, alongX ? a : mid, alongX ? mid : a, ph);
+      tower(key, alongX ? sw : L - 6, hb + rnd() * 12, alongX ? L - 6 : sw, alongX ? a : mid, alongX ? mid : a, ph); // P1 + P5
     }
     lampOn = 0.65;
   } else if (zone === 'fog') {
