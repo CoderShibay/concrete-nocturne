@@ -339,7 +339,32 @@ const uvFor = k => k.startsWith('win') ? [TEX_W, TEX_H] : (UV[k] || [4, 4]);
 /* ---------- neon sign textures ---------- */
 const V_SIGNS = ['夜市', '無限', '電脳', '酒場', 'ホテル', 'ラーメン', '喫茶', '静寂'];
 const H_SIGNS = ['NOCTURNE', 'RAMEN 24H', 'HOTEL VOID', 'ARCADE', 'LOW TIDE', 'CONCRETE FM', 'NOODLE BAR', 'NO VACANCY'];
-let vSignTex = [], hSignTex = [];
+let vSignTex = [], hSignTex = [], roadSignMats = [], adTex = [], openTex = null;
+// P9: motorway signs that name places the road never takes you to
+const ROAD_SIGNS = ['HARBOUR 14  ↑', 'AIRPORT  ↗', 'OLD TOWN  ←', 'CITY CENTRE  ↑', 'NORTH RING  →', 'EXIT TO ELSEWHERE'];
+function roadSignTexture(text) {
+  const W = 512, H = 192, c = mkCanvas(W, H), x = c.getContext('2d');
+  x.fillStyle = '#1c4f37'; x.fillRect(0, 0, W, H);
+  x.strokeStyle = '#d8e4dc'; x.lineWidth = 6; rrect(x, 12, 12, W - 24, H - 24, 14); x.stroke();
+  x.fillStyle = '#e4ece6'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  let fs = 64; x.font = `700 ${fs}px "Helvetica Neue",Arial,sans-serif`;
+  while (x.measureText(text).width > W - 70 && fs > 20) { fs -= 2; x.font = `700 ${fs}px "Helvetica Neue",Arial,sans-serif`; }
+  x.fillText(text, W / 2, H / 2 + 2);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = aniso; return t;
+}
+// P8: backlit ads on empty forecourts, selling to nobody
+const ADS = [['YOU', 'DESERVE', 'MORE'], ['NOW', 'LEASING'], ['LIVE', 'ABOVE', 'IT ALL'], ['ALWAYS', 'OPEN'], ['FIND', 'YOUR', 'PLACE']];
+function adTexture(lines) {
+  const W = 256, H = 384, c = mkCanvas(W, H), x = c.getContext('2d');
+  x.fillStyle = '#e6e1d6'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#26221e'; x.textAlign = 'left'; x.textBaseline = 'alphabetic';
+  x.font = '700 48px "Helvetica Neue",Arial,sans-serif';
+  lines.forEach((l, k) => x.fillText(l, 22, 90 + k * 54));
+  x.fillStyle = '#8a8378'; x.font = '400 13px "Helvetica Neue",Arial,sans-serif';
+  x.fillText('Terms apply. Units from the 40th floor.', 22, H - 30);
+  x.fillStyle = '#b8472a'; x.fillRect(22, H - 70, 60, 6);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = aniso; return t;
+}
 function signTexture(text, color, vertical) {
   const W = vertical ? 128 : 512, H = vertical ? 512 : 128, c = mkCanvas(W, H), x = c.getContext('2d');
   x.fillStyle = 'rgba(10,6,20,0.93)'; rrect(x, 6, 6, W - 12, H - 12, 14); x.fill();
@@ -484,8 +509,26 @@ function genCell(i, j) {
     // P1 + P2: an open forecourt; the tower stands far back from every road, so the street reads far wider
     plinth(0.4);
     if ((li + lj) % 2 === 0) tower(win(), 30 + rnd() * 8, 260 + rnd() * 120, 30 + rnd() * 8, mid, mid, ph); // P1: fewer, bigger masses
+    else if (rnd() < 0.7) { // P8: a lit ad on a pylon in the middle of the empty forecourt, selling to nobody
+      addBox(bk, 'pole', 'pole', 0.7, 9, 0.7, mid, ph + 4.5, mid);
+      const am = new THREE.MeshBasicMaterial({ map: adTex[Math.floor(rnd() * adTex.length)], color: 0x9c9890 });
+      const ag = new THREE.BoxGeometry(5, 7.5, 5), ad = new THREE.Mesh(ag, am); ad.position.set(mid, ph + 12.75, mid); grp.add(ad);
+      signMats.push(am); extras.push(ag);
+      if (rnd() < 0.4) flick.push({ m: am, seed: rnd() * 100, mode: rnd() < 0.5 ? 'dead' : 'flick' });
+    }
+    // P10: a knee-high ledge along both road edges with spikes along it, and benches with armrests
+    for (const alongX of [true, false]) {
+      const lx = alongX ? mid : A + 1.4, lz = alongX ? A + 1.4 : mid;
+      addBox(bk, 'concrete', 'concrete', alongX ? L - 2 : 0.8, 0.6, alongX ? 0.8 : L - 2, lx, ph + 0.3, lz);
+      for (let q = A + 1.3; q < B - 1; q += 0.6) addBox(bk, 'pole', 'pole', 0.06, 0.18, 0.06, alongX ? q : lx, ph + 0.69, alongX ? lz : q);
+    }
+    for (const q of [A + 16, B - 16]) {
+      addBox(bk, 'pole', 'pole', 0.5, 0.1, 2.4, A + 4.2, ph + 0.45, q);
+      for (const dq of [-1.15, 0, 1.15]) addBox(bk, 'pole', 'pole', 0.5, 0.3, 0.07, A + 4.2, ph + 0.62, q + dq);
+    }
     lampOn = 0.85;
   } else if (zone === 'plaza') {
+    const fenced = !(li === 1 && lj === 1) && rnd() < 0.6;
     // P2: the square is empty ground; one monument in the middle block, one lamp beside it
     plinth(0.3);
     if (li === 1 && lj === 1) {
@@ -495,15 +538,49 @@ function genCell(i, j) {
       addBox(bk, 'lamp', 'lamp', 0.7, 0.25, 0.7, mid + 14, ph + 9, mid + 14);
       addFlat(bk, 'glow', mid + 14, mid + 14, 22, ph + 0.03);
     }
+    if (fenced) { // P10: a fence around the empty ground, posts every three metres, no way in
+      const e0 = A + 0.6, e1 = B - 0.6, fl = e1 - e0, fm = (e0 + e1) / 2;
+      for (const [x, z, alongX] of [[fm, e0, true], [fm, e1, true], [e0, fm, false], [e1, fm, false]]) {
+        for (const yy of [1.1, 2.1]) addBox(bk, 'pole', 'pole', alongX ? fl : 0.05, 0.05, alongX ? 0.05 : fl, x, ph + yy, z);
+        for (let q = 0; q <= fl + 0.01; q += 3) addBox(bk, 'pole', 'pole', 0.08, 2.2, 0.08, alongX ? e0 + q : x, ph + 1.1, alongX ? z : e0 + q);
+      }
+    }
     lampOn = 0.15;
   } else if (zone === 'interchange') {
-    // P9 (first pass): open parking decks of bare concrete on columns; the overpasses come in a later step
+    // P9: elevated roads cross overhead on columns that stand only on the lots. They come out of one concrete
+    // portal and go into another; there is no ramp down to you. Green signs name places you'll never reach.
     plinth(1.2);
-    const levels = 3 + Math.floor(rnd() * 3), w = L - 8, d = L - 8, top = levels * 4.2;
-    for (let k = 1; k <= levels; k++) addBox(bk, 'concrete', 'roof', w, 0.9, d, mid, ph + k * 4.2, mid);
-    for (const x of [-1, 0, 1]) for (const z of [-1, 0, 1]) addBox(bk, 'concrete', 'concrete', 1.2, top, 1.2, mid + x * w * 0.42, ph + top / 2, mid + z * d * 0.42);
-    roofs.push({ x: mid, z: mid, w, d, y: ph + top + 0.45 });
-    signChance = 0.3; lampOn = 0.6;
+    const axisX = zr() < 0.5, second = zr() < 0.55;
+    const deck = (alongX, y, lk, sideRnd) => {
+      const a0 = lk === 0 ? A : 0, a1 = lk === 2 ? B : C, len = a1 - a0, am = (a0 + a1) / 2;
+      const bx = (along, h, across, a, yy, b2, key = 'concrete', top = 'roof') => alongX ? addBox(bk, key, top, along, h, across, a, yy, b2) : addBox(bk, key, top, across, h, along, b2, yy, a);
+      bx(len, 1.4, 14, am, y, mid);                                                      // deck
+      bx(len, 1.1, 0.3, am, y + 1.25, mid - 6.85, 'concrete', 'concrete');                // barriers
+      bx(len, 1.1, 0.3, am, y + 1.25, mid + 6.85, 'concrete', 'concrete');
+      for (const ca of [A + 8, B - 8]) if (ca > a0 && ca < a1) bx(3, y - ph, 3, ca, ph + (y - ph) / 2, mid, 'concrete', 'concrete');
+      if (lk === 0) bx(16, y + 5 - ph, 18, A + 8, ph + (y + 5 - ph) / 2, mid, 'concrete', 'roof');   // portal it comes out of
+      if (lk === 2) bx(16, y + 5 - ph, 18, B - 8, ph + (y + 5 - ph) / 2, mid, 'concrete', 'roof');   // portal it disappears into
+      for (const la of [am - len / 4, am + len / 4]) { bx(0.2, 3, 0.2, la, y + 2.2, mid - 6.6, 'pole', 'pole'); bx(0.9, 0.2, 0.4, la, y + 3.7, mid - 6.3, 'lamp', 'lamp'); }
+      if (a0 === 0) {                                                                     // where the deck crosses the road below
+        bx(R - 4, 0.05, 0.25, R / 2, y - 0.72, mid, 'fluo', 'fluo');                      // underpass strip light
+        const sm = roadSignMats[Math.floor(sideRnd * roadSignMats.length)];
+        for (const sgn of [-1, 1]) {
+          const sign = new THREE.Mesh(planeGeo, sm); sign.scale.set(9, 3.4, 1);
+          if (alongX) { sign.position.set(R / 2, y - 2.4, mid + sgn * 7.12); sign.rotation.y = sgn > 0 ? 0 : Math.PI; }
+          else { sign.position.set(mid + sgn * 7.12, y - 2.4, R / 2); sign.rotation.y = sgn > 0 ? Math.PI / 2 : -Math.PI / 2; }
+          grp.add(sign);
+        }
+      }
+    };
+    deck(axisX, 13, axisX ? li : lj, zr());
+    if (second) deck(!axisX, 22, axisX ? lj : li, zr());
+    // P4: a few parked cars under the highway, nobody in them
+    const nCars = 2 + Math.floor(rnd() * 4);
+    for (let k = 0; k < nCars; k++) {
+      const x = A + 12 + k * 6.5 + rnd() * 2, z = B - 9;
+      addBox(bk, 'roof', 'roof', 1.9, 0.75, 4.4, x, ph + 0.55, z); addBox(bk, 'dark', 'dark', 1.6, 0.5, 2.2, x, ph + 1.15, z + 0.3);
+    }
+    signChance = 0; lampOn = 0.6;
   } else if (zone === 'residential') {
     // P3 (first pass): a wall of housing slabs, most of their windows dark
     plinth(2.5);
@@ -511,6 +588,15 @@ function genCell(i, j) {
     for (let k = 0; k < n; k++) {
       const a = A + 1 + sw / 2 + k * (sw + gap), key = rnd() < 0.55 ? 'win4' : 'win0';
       tower(key, alongX ? sw : L - 6, hb + rnd() * 12, alongX ? L - 6 : sw, alongX ? a : mid, alongX ? mid : a, ph); // P1 + P5
+    }
+    if (rnd() < 0.5) { // P10: a locked gate across the gap between two slabs; behind it, a lit courtyard you can't enter
+      const g0 = A + 1 + sw, g1 = g0 + gap, gm = (g0 + g1) / 2;
+      const gx = (along, h, across, a, yy, b2, key) => alongX ? addBox(bk, key, key, along, h, across, a, yy, b2) : addBox(bk, key, key, across, h, along, b2, yy, a);
+      for (let q = g0 + 0.2; q < g1 - 0.1; q += 0.28) gx(0.05, 3, 0.05, q, ph + 1.5, A + 0.4, 'pole');
+      gx(gap, 0.1, 0.08, gm, ph + 3, A + 0.4, 'pole'); gx(gap, 0.1, 0.08, gm, ph + 0.4, A + 0.4, 'pole');
+      gx(0.2, 5, 0.2, gm, ph + 2.5, A + 14, 'pole'); gx(0.7, 0.22, 0.7, gm, ph + 5, A + 14, 'lamp');
+      gx(1.4, 2.4, 0.05, g0 + 0.06 + 0.7, ph + 1.2, A + 20, 'warmwin');     // a lit doorway at the far end
+      const [fx, fz] = alongX ? [gm, A + 14] : [A + 14, gm]; addFlat(bk, 'glow', fx, fz, 14, ph + 0.04);
     }
     lampOn = 0.65;
   } else if (zone === 'fog') {
@@ -578,7 +664,10 @@ function genCell(i, j) {
     const m = new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.05 });
     const s = new THREE.Mesh(planeGeo, m); s.scale.set(sw, sh, 1); s.position.copy(pos);
     s.rotation.y = [-Math.PI / 2, Math.PI / 2, Math.PI, 0][side]; grp.add(s); signMats.push(m);
-    if (rnd() < 0.35) flick.push({ m, seed: rnd() * 100 });
+    const roll = rnd();
+    if (tex === openTex) flick.push({ m, seed: rnd() * 10, mode: 'blink' });
+    else if (roll < 0.3) { m.color.setScalar(0.16); flick.push({ m, seed: rnd() * 100, mode: 'dead' }); }
+    else if (roll < 0.55) flick.push({ m, seed: rnd() * 100, mode: 'flick' });
   };
   const nSigns = rnd() < signChance ? 1 : 0;
   for (let s = 0; s < nSigns && facades.length; s++) {
@@ -593,6 +682,14 @@ function genCell(i, j) {
     if (side === 0) pos.set(f.x0 - off, y, along); else if (side === 1) pos.set(f.x1 + off, y, along);
     else if (side === 2) pos.set(along, y, f.z0 - off); else pos.set(along, y, f.z1 + off);
     place(tex, sw, sh, pos, side);
+  }
+  // P8: a small OPEN sign low on a corner building, blinking at an empty street
+  if (zone === 'corner' && facades.length && rnd() < 0.35) {
+    const f = facades[0], side = Math.floor(rnd() * 4), lo = side < 2 ? f.z0 : f.x0, hi = side < 2 ? f.z1 : f.x1;
+    const along = lo + 3 + rnd() * Math.max(0, hi - lo - 6), pos = new THREE.Vector3(), y = f.y0 + 4;
+    if (side === 0) pos.set(f.x0 - 0.3, y, along); else if (side === 1) pos.set(f.x1 + 0.3, y, along);
+    else if (side === 2) pos.set(along, y, f.z0 - 0.3); else pos.set(along, y, f.z1 + 0.3);
+    place(openTex, 4.2, 1.1, pos, side);
   }
   // rooftop billboard, only on the ordinary corners
   if (zone === 'corner' && roofs.length && rnd() < 0.08) {
@@ -896,7 +993,7 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(C * 24, C * 24), groundMat
 ground.rotation.x = -Math.PI / 2; scene.add(ground);
 
 /* ---------- car ---------- */
-const car = { boost: 1, boosting: 0, pos: new THREE.Vector3(R / 2 + 3, 0, 40), heading: 0, speed: 0, vel: new THREE.Vector3(), steer: 0, bump: 0, drift: 0 };
+const car = { boost: 1, boosting: 0, pos: new THREE.Vector3(C + R / 2 + 3, 0, 40), heading: 0, speed: 0, vel: new THREE.Vector3(), steer: 0, bump: 0, drift: 0 };
 const carMesh = new THREE.Group(); scene.add(carMesh);
 const frontWheels = [], flames = [], wheelRings = [];
 let boostLight = null;
@@ -1762,7 +1859,9 @@ function frame() {
   for (const cell of cells.values()) if (cell.tick) cell.tick(dt, elapsed);
   for (const cell of cells.values()) for (const f of cell.flick) {
     const s = Math.sin(elapsed * 1.3 + f.seed);
-    f.m.color.setScalar(s > 0.92 && Math.random() < 0.5 ? 0.2 : 1);
+    if (f.mode === 'dead') f.m.color.setScalar(s > 0.985 && Math.random() < 0.6 ? 0.9 : 0.16);        // mostly out, now and then it tries
+    else if (f.mode === 'blink') f.m.color.setScalar(((elapsed + f.seed) % 1.8) < 1.15 ? 1 : 0.06);   // OPEN, OPEN, OPEN
+    else f.m.color.setScalar(s > 0.92 && Math.random() < 0.5 ? 0.2 : 1);
   }
 
   if (started && elapsed > nextDistant) { nextDistant = elapsed + 45 + Math.random() * 70; radio.distant(); }
@@ -1812,6 +1911,9 @@ async function boot() {
   try { await Promise.race([document.fonts.load('700 52px Syncopate'), new Promise(r => setTimeout(r, 1500))]); } catch (e) {}
   vSignTex = V_SIGNS.map((s, k) => signTexture(s, NEON_CSS[k % NEON_CSS.length], true));
   hSignTex = H_SIGNS.map((s, k) => signTexture(s, NEON_CSS[(k + 2) % NEON_CSS.length], false));
+  roadSignMats = ROAD_SIGNS.map(t => new THREE.MeshBasicMaterial({ map: roadSignTexture(t), color: 0xa6aaa6 }));
+  adTex = ADS.map(adTexture);
+  openTex = signTexture('OPEN', '#ff8a3a', false);
   updateCells(); pumpCells(999);
   frame();
 }
