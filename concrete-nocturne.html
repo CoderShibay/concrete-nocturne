@@ -1035,7 +1035,7 @@ const radio = {
     }
     this.slapG.gain.setTargetAtTime(canyon ? 0.12 : 0.02, t, 0.35);
     this.wind.f.frequency.setTargetAtTime(350 + sp * 18, t, 0.5);
-    this.wind.g.gain.setTargetAtTime(Math.pow(sp / 60, 2) * 0.07, t, 0.5);
+    this.wind.g.gain.setTargetAtTime(Math.min(1.6, Math.pow(sp / 70, 2)) * 0.06, t, 0.5);
     this.roll.f.frequency.setTargetAtTime(120 + sp * 5, t, 0.3); this.roll.g.gain.setTargetAtTime(ship ? 0 : Math.min(1, sp / 30) * 0.08, t, 0.3);
     const sq = !ship && c.slip > 0.14 && sp > 8 ? Math.min(1, (c.slip - 0.14) * 3) : 0;
     this.screech.g.gain.setTargetAtTime(sq * 0.05, t, 0.1); this.screech2.g.gain.setTargetAtTime(sq * 0.025, t, 0.1);
@@ -1140,7 +1140,7 @@ function pumpCells(n) {
 /* ---------- physics ---------- */
 const fwd = new THREE.Vector3(), tmp = new THREE.Vector3();
 const MAX = 46;
-const RATIOS = [0, 3.6, 2.3, 1.65, 1.25, 1.0], RPM_PER_MS = 135, REDLINE = 7000, IDLE = 900;
+const RATIOS = [0, 3.6, 2.3, 1.65, 1.25, 1.0], RPM_PER_MS = 90, REDLINE = 7000, IDLE = 900;
 Object.assign(car, { rpm: IDLE, gear: 1, shiftT: 0, throttle: 0, slip: 0, accel: 0, yaw: 0, popT: 0,
   pitch: 0, pitchV: 0, roll: 0, rollV: 0, heave: 0, heaveV: 0 });
 const torque = rpm => 0.72 + 0.28 * Math.sin(clamp((rpm - 1000) / 5600, 0, 1) * Math.PI);
@@ -1150,17 +1150,17 @@ function drive(dt) {
   // booster
   const boosting = boost && car.boost > 0.02 && car.speed > -1;
   car.boosting += ((boosting ? 1 : 0) - car.boosting) * Math.min(1, dt * 6);
-  if (boosting) { car.boost = Math.max(0, car.boost - dt * 0.3); car.speed += 30 * dt; }
+  if (boosting) { car.boost = Math.max(0, car.boost - dt * 0.24); car.speed += 48 * dt; }
   else car.boost = Math.min(1, car.boost + dt * (boost ? 0 : 0.12));
 
   if (vehicle !== 'car') {
-    const hp = vehicle === 'ship' ? { acc: 18, top: 68, turn: 1.8, grip: 2.4 } : { acc: 15, top: 55, turn: 2.0, grip: 3.2 };
+    const hp = vehicle === 'ship' ? { acc: 24, top: 100, turn: 1.8, grip: 2.4 } : { acc: 20, top: 80, turn: 2.0, grip: 3.2 };
     car.throttle += ((up ? 1 : 0) - car.throttle) * Math.min(1, dt * 4);
     let a = car.throttle * hp.acc * (1 - clamp(car.speed / hp.top, 0, 1));
     if (down) a -= car.speed > 1 ? 18 : 6;
-    a -= car.speed * (up ? 0.05 : 0.22) + 0.0025 * car.speed * Math.abs(car.speed);
+    a -= car.speed * (up ? 0.02 : 0.2) + 0.0008 * car.speed * Math.abs(car.speed);
     if (brake) a -= car.speed * 0.4;
-    car.speed = clamp(car.speed + a * dt, -12, 95);
+    car.speed = clamp(car.speed + a * dt, -12, 125);
     car.rpm = IDLE + Math.min(1, Math.abs(car.speed) / hp.top) * (REDLINE - IDLE); car.gear = 'H';
     const steerTarget = (left ? 1 : 0) - (right ? 1 : 0);
     car.steer += (steerTarget - car.steer) * Math.min(1, dt * 3.5);
@@ -1192,14 +1192,14 @@ function drive(dt) {
 
   // longitudinal forces
   let a = 0;
-  if (throttleOn && car.speed > -0.5) a += 13.5 * torque(car.rpm) * Math.pow(RATIOS[car.gear] / 1.6, 0.3) * (car.rpm >= REDLINE - 400 ? 0.3 : 1);
+  if (throttleOn && car.speed > -0.5) a += 18 * torque(car.rpm) * Math.pow(RATIOS[car.gear] / 1.6, 0.3) * (car.rpm >= REDLINE - 400 ? 0.3 : 1);
   if (down) a -= car.speed > 1 ? 26 : 7;
   if (!up && !down) a -= Math.sign(car.speed) * (0.6 + 0.9 * RATIOS[car.gear] / 3.6) * Math.min(1, Math.abs(car.speed)); // engine braking
-  a -= Math.sign(car.speed) * (0.0048 * car.speed * car.speed + 0.35); // aero drag + rolling
+  a -= Math.sign(car.speed) * (0.0022 * car.speed * car.speed + 0.35); // aero drag + rolling
   if (brake) a -= car.speed * 0.7;
   car.speed += a * dt;
   if (Math.abs(car.speed) < 0.05 && !up && !down) car.speed = 0;
-  car.speed = clamp(car.speed, -10, 90);
+  car.speed = clamp(car.speed, -10, 125);
   // lift-off crackle at high revs
 
   // steering: slower rack at speed, tyres lose grip under drift or harsh inputs
@@ -1267,7 +1267,7 @@ function updateCamera(dt, t) {
   } else {
     const dist = camMode === 0 ? ({ board: 7.5, ship: 9 }[vehicle] || 9) : 22, h = camMode === 0 ? ({ board: 3.2, ship: 3.9 }[vehicle] || 3.2) : 11;
     camWant.copy(car.pos).addScaledVector(fwd, -dist); camWant.y = h;
-    camera.position.lerp(camWant, 1 - Math.exp(-(camMode === 0 ? 4.5 : 1.8) * dt));
+    camera.position.lerp(camWant, 1 - Math.exp(-((camMode === 0 ? 4.5 : 1.8) + Math.abs(car.speed) * 0.06) * dt));
     camTarget.copy(car.pos).addScaledVector(fwd, camMode === 0 ? 6 : 2); camTarget.y = camMode === 0 ? 1.4 : 3;
     look.lerp(camTarget, 1 - Math.exp(-8 * dt)); camera.lookAt(look);
   }
@@ -1275,7 +1275,7 @@ function updateCamera(dt, t) {
     camera.position.x += (Math.random() - 0.5) * car.bump * 0.4; camera.position.y += (Math.random() - 0.5) * car.bump * 0.3;
     car.bump = Math.max(0, car.bump - dt * 2.5);
   }
-  const fov = 62 + Math.min(Math.abs(car.speed), 60) * 0.28 + car.boosting * 8;
+  const fov = 62 + Math.min(Math.abs(car.speed), 110) * 0.17 + car.boosting * 10;
   if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 3); camera.updateProjectionMatrix(); }
 }
 
