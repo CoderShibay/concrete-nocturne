@@ -1293,6 +1293,10 @@ const radio = {
     for (let k = 0; k < cd.length; k++) cd[k] = (Math.random() * 2 - 1) * 0.012 + (Math.random() < 0.00035 ? (Math.random() * 2 - 1) * 0.7 : 0);
     const cs = ctx.createBufferSource(); cs.buffer = cb; cs.loop = true; const chp = ctx.createBiquadFilter(); chp.type = 'highpass'; chp.frequency.value = 900;
     const cg = ctx.createGain(); cg.gain.value = 0.22; cs.connect(chp); chp.connect(cg); cg.connect(this.music); cs.start();
+    // the radio itself is ready: start it now, so a failure in a later layer can't leave the whole game silent
+    this.step = 0; this.next = ctx.currentTime + 0.15;
+    this.timer = setInterval(() => { try { this.schedule(); } catch (e) { console.error('Concrete Nocturne: radio', e); } }, 25);
+    this.master.gain.setValueAtTime(0, ctx.currentTime); this.master.gain.linearRampToValueAtTime(0.85, ctx.currentTime + 2.5);
     // rain: brown-noise body + airy hiss + two looping droplet textures of different lengths
     const brown = ctx.createBuffer(2, ctx.sampleRate * 4, ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) { const d = brown.getChannelData(ch); let last = 0; for (let k = 0; k < d.length; k++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[k] = last * 3.5; } }
@@ -1367,9 +1371,7 @@ const radio = {
     this.roofG = loop(drops(2.3, 150), [['bandpass', 520, 0.8]], 0.0);
     this.spray = mk(nb, 'bandpass', 2600, 0.7);
 
-    this.step = 0; this.next = ctx.currentTime + 0.15;
-    this.timer = setInterval(() => this.schedule(), 25);
-    this.master.gain.linearRampToValueAtTime(0.85, ctx.currentTime + 2.5);
+    this.full = true;   // rain, engine, hover hum and the rest are all in place
   },
   mtof: n => 440 * Math.pow(2, (n - 69) / 12),
   prog: [
@@ -1455,9 +1457,9 @@ const radio = {
     o.onended = () => { try { this.wob.disconnect(o.detune); } catch (e) {} };
   },
   setMusic(on) { this.musicOn = on; if (this.ctx) this.music.gain.setTargetAtTime(on ? 0.9 : 0, this.ctx.currentTime, 0.4); },
-  setRain(on) { this.rainOn = on; if (this.ctx) this.rainG.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.5); },
+  setRain(on) { this.rainOn = on; if (this.full) this.rainG.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.5); },
   distant() {
-    if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime, out = ctx.createGain(), lp = ctx.createBiquadFilter();
+    if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, out = ctx.createGain(), lp = ctx.createBiquadFilter();
     const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null; lp.type = 'lowpass'; lp.frequency.value = 800;
     out.connect(lp); if (pan) { pan.pan.value = Math.random() * 1.6 - 0.8; lp.connect(pan); pan.connect(this.comp); pan.connect(this.rev); } else { lp.connect(this.comp); lp.connect(this.rev); }
     const roll = Math.random();
@@ -1496,7 +1498,7 @@ const radio = {
     }
   },
   wiper() { // one slow sweep and back, then the soft knock at the end of its travel
-    if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime, s2 = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, s2 = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     s2.buffer = this.noise; f.type = 'bandpass'; f.Q.value = 1.4;
     f.frequency.setValueAtTime(700, t); f.frequency.linearRampToValueAtTime(1500, t + 0.45); f.frequency.linearRampToValueAtTime(700, t + 0.9);
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.012, t + 0.1); g.gain.setValueAtTime(0.012, t + 0.8); g.gain.linearRampToValueAtTime(0, t + 0.95);
@@ -1506,11 +1508,11 @@ const radio = {
     o.connect(og); og.connect(this.comp); o.start(t + 0.9); o.stop(t + 1.05);
   },
   boostSound(b) {
-    if (!this.ctx) return; const t = this.ctx.currentTime;
+    if (!this.full) return; const t = this.ctx.currentTime;
     this.boostG.gain.setTargetAtTime(b * 0.22, t, 0.08); this.boostF.frequency.setTargetAtTime(400 + b * 1600, t, 0.2);
   },
   thunder(delay, power) {
-    if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime + delay;
+    if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime + delay;
     // sharp crack, only when the strike is close
     if (power > 0.6) {
       const c = ctx.createBufferSource(), cf = ctx.createBiquadFilter(), cg = ctx.createGain();
@@ -1528,7 +1530,7 @@ const radio = {
     r.connect(lp); lp.connect(g); g.connect(this.comp); g.connect(this.rev); r.start(t, Math.random() * 3); r.stop(t + dur + 0.1);
   },
   engine(c, canyon, ship) {
-    if (!this.ctx) return; const t = this.ctx.currentTime, rpm = c.rpm, load = c.throttle, sp = Math.abs(c.speed);
+    if (!this.full) return; const t = this.ctx.currentTime, rpm = c.rpm, load = c.throttle, sp = Math.abs(c.speed);
     this.roofG.gain.setTargetAtTime(this.rainOn && !ship ? 0.55 : 0, t, 0.6);
     this.spray.g.gain.setTargetAtTime(this.rainOn ? Math.min(1, sp / 30) * 0.05 * (ship ? 0.35 : 1) : 0, t, 0.25);
     if (ship) {
@@ -1554,35 +1556,35 @@ const radio = {
     this.screech.g.gain.setTargetAtTime(sq * 0.05, t, 0.1); this.screech2.g.gain.setTargetAtTime(sq * 0.025, t, 0.1);
   },
   pop(big) { // exhaust backfire
-    if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime + Math.random() * 0.03;
+    if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime + Math.random() * 0.03;
     const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     s.buffer = this.noise; f.type = 'lowpass'; f.frequency.value = 900 + Math.random() * 1400;
     g.gain.setValueAtTime(big ? 0.14 : 0.06, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
     s.connect(f); f.connect(g); g.connect(this.comp); g.connect(this.rev); s.start(t, Math.random()); s.stop(t + 0.09);
   },
   blowoff() { // turbo release on upshift
-    if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime;
+    if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime;
     const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     s.buffer = this.noise; f.type = 'bandpass'; f.Q.value = 1.5; f.frequency.setValueAtTime(3500, t); f.frequency.exponentialRampToValueAtTime(1200, t + 0.3);
     g.gain.setValueAtTime(0.035, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
     s.connect(f); f.connect(g); g.connect(this.comp); s.start(t, Math.random()); s.stop(t + 0.4);
   },
   whoosh(v, pan) { // passing a lamp post
-    if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime;
+    if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime;
     const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
     s.buffer = this.noise; f.type = 'bandpass'; f.Q.value = 1.2; f.frequency.setValueAtTime(1400, t); f.frequency.exponentialRampToValueAtTime(500, t + 0.35);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.025 * v, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
     s.connect(f); f.connect(g); if (p) { p.pan.value = pan; g.connect(p); p.connect(this.comp); } else g.connect(this.comp); s.start(t, Math.random()); s.stop(t + 0.45);
   },
   ring(pan) { // an old payphone bell: two tones, trilling, two bursts
-    if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime, out = ctx.createGain(), lp = ctx.createBiquadFilter();
+    if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, out = ctx.createGain(), lp = ctx.createBiquadFilter();
     const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null; lp.type = 'lowpass'; lp.frequency.value = 2600; out.gain.value = 0;
     out.connect(lp); if (p) { p.pan.value = pan; lp.connect(p); p.connect(this.comp); p.connect(this.rev); } else { lp.connect(this.comp); lp.connect(this.rev); }
     for (const f of [440, 480]) { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(out); o.start(t); o.stop(t + 1.3); }
     for (const [a, b] of [[0, 0.45], [0.65, 1.1]]) for (let k = t + a; k < t + b; k += 0.05) { out.gain.setValueAtTime(0.028, k); out.gain.setValueAtTime(0, k + 0.025); }
   },
   click(pan) { // a relay somewhere as a lamp goes out
-    if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime, s2 = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, s2 = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
     s2.buffer = this.noise; f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 3;
     g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
@@ -1590,13 +1592,13 @@ const radio = {
     s2.start(t, Math.random()); s2.stop(t + 0.06);
   },
   trainHorn() { // closer than the distant one: the lit train crossing ahead
-    if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime, out = ctx.createGain(), lp = ctx.createBiquadFilter(), dur = 3.6;
+    if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, out = ctx.createGain(), lp = ctx.createBiquadFilter(), dur = 3.6;
     lp.type = 'lowpass'; lp.frequency.value = 1300; out.connect(lp); lp.connect(this.comp); lp.connect(this.rev);
     for (const f of [277, 330, 415]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = Math.random() * 10 - 5; o.connect(out); o.start(t); o.stop(t + dur); }
     out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(0.014, t + 0.4); out.gain.setValueAtTime(0.014, t + 2.4); out.gain.linearRampToValueAtTime(0, t + dur);
   },
   thump(v) {
-    if (!this.ctx) return; const ctx = this.ctx, t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+    if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
     o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(30, t + 0.2);
     g.gain.setValueAtTime(0.35 * v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3); o.connect(g); g.connect(this.master); o.start(t); o.stop(t + 0.32);
   }
@@ -1623,7 +1625,9 @@ document.querySelectorAll('.tb').forEach(btn => {
 });
 
 const $ = id => document.getElementById(id);
-function toggleMusic() { radio.setMusic(!radio.musicOn); $('bMusic').classList.toggle('on', radio.musicOn); document.body.classList.toggle('music-on', radio.musicOn && started); }
+function toggleMusic() {
+  if (radio.ctx && radio.ctx.state !== 'running') { wakeAudio(); return; }   // first click just wakes paused sound
+  radio.setMusic(!radio.musicOn); $('bMusic').classList.toggle('on', radio.musicOn); document.body.classList.toggle('music-on', radio.musicOn && started); }
 function toggleRain() { radio.setRain(!radio.rainOn); rain.visible = radio.rainOn; $('bRain').classList.toggle('on', radio.rainOn); }
 const CAMS = ['chase', 'cinematic', 'hood'];
 let camMode = 0;
@@ -1641,10 +1645,15 @@ let started = false, lastLampX = 0, lastLampZ = 0, wasOnStripe = false;
 function start() {
   if (started) return; started = true;
   $('intro').classList.add('gone');
-  try { radio.init(); } catch (e) {}
+  try { radio.init(); } catch (e) { console.error('Concrete Nocturne: sound setup failed', e); radio.failed = true; }
+  wakeAudio();
   document.body.classList.toggle('music-on', radio.musicOn);
 }
 $('go').onclick = start;
+// Browsers (Safari especially) pause a page's audio when you switch tabs or apps. Wake it on the next touch or key.
+function wakeAudio() { const c = radio.ctx; if (c && c.state !== 'running' && c.resume) c.resume().catch(() => {}); }
+for (const ev of ['pointerdown', 'keydown', 'touchend']) addEventListener(ev, () => { if (started) wakeAudio(); }, true);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && started) wakeAudio(); });
 
 /* ---------- city streaming ---------- */
 const cells = new Map(), queue = [];
@@ -1818,6 +1827,11 @@ function updateCamera(dt, t) {
 let lastDistrict = '';
 function updateHud(elapsed) {
   $('speed').textContent = Math.round(Math.abs(car.speed) * 3.6);
+  if (started) { // tell the player when there is no sound, instead of failing silently
+    const st = radio.failed || !radio.ctx ? 'Sound failed · see console' : radio.ctx.state !== 'running' ? 'Sound paused · click' : null;
+    const label = st || 'Music';
+    if ($('bMusic').dataset.label !== label) { $('bMusic').dataset.label = label; $('bMusic').innerHTML = `${label}<kbd>M</kbd>`; }
+  }
   $('gear').textContent = vehicle === 'board' ? 'HOVER' : vehicle === 'ship' ? 'FLIGHT' : car.speed < -0.5 ? 'R' : car.gear;
   $('tachFill').style.transform = `scaleX(${(car.rpm / REDLINE).toFixed(3)})`;
   $('tachFill').parentNode.classList.toggle('red', car.rpm > 6300);
