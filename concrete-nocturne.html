@@ -55,6 +55,19 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
 .chip kbd{font:inherit;opacity:.55;margin-left:6px}
 .chip:focus-visible,.go:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 
+/* minimap */
+.minimap{width:150px;height:150px;display:block;border:1px solid var(--faint);background:var(--glass);border-radius:2px;margin-top:4px;align-self:flex-end}
+@media (max-width:560px){.minimap{width:108px;height:108px}}
+
+/* pause */
+.pause{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;gap:40px;padding:24px;background:rgba(5,6,9,.78);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);flex-wrap:wrap;overflow:auto}
+.pause-text{display:flex;flex-direction:column;gap:16px;max-width:320px}
+.pause h2{margin:0;font-family:var(--display);font-weight:700;font-size:30px;letter-spacing:.14em;text-transform:uppercase;text-shadow:0 0 22px rgba(255,138,58,.45)}
+.pause p{margin:0;color:var(--dim);font-size:13px;line-height:1.6}
+.pause .keys{font-size:12px}
+.bigmap{width:min(560px,86vw);height:min(560px,86vw);border:1px solid var(--faint);border-radius:2px;display:block}
+.maplabel{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+
 /* start screen */
 .intro{position:fixed;inset:0;display:flex;align-items:flex-end;padding:0 24px calc(env(safe-area-inset-bottom,0px) + 48px);background:linear-gradient(20deg,rgba(7,6,15,.92) 0%,rgba(7,6,15,.55) 40%,rgba(7,6,15,0) 70%);transition:opacity .9s}
 .intro.gone{opacity:0;pointer-events:none}
@@ -98,6 +111,7 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
   <div class="stack">
     <div class="clock" id="clock">23:12</div>
     <div class="radio"><div class="eq"><i></i><i></i><i></i><i></i></div><span class="rname">88.4 FM · Radio Panelka</span></div>
+    <canvas class="minimap" id="minimap" aria-label="Map of the streets around you" width="300" height="300"></canvas>
   </div>
 </div>
 
@@ -113,6 +127,7 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
     <button class="chip on" id="bRain" type="button">Rain<kbd>R</kbd></button>
     <button class="chip" id="bVeh" type="button">Vehicle: car<kbd>V</kbd></button>
     <button class="chip" id="bCam" type="button">Camera: chase<kbd>C</kbd></button>
+    <button class="chip" id="bPause" type="button">Pause<kbd>Esc</kbd></button>
   </div>
 </div>
 
@@ -129,6 +144,25 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
   </div>
 </div>
 
+<div class="pause" id="pause" hidden>
+  <div class="pause-text">
+    <h2>Paused</h2>
+    <p>The city waits. It isn't waiting for you.</p>
+    <dl class="keys">
+      <dt>Esc / P</dt><dd>Keep driving</dd>
+      <dt>W A S D</dt><dd>Drive, steer</dd>
+      <dt>Space · Shift</dt><dd>Booster · drift</dd>
+      <dt>V · C</dt><dd>Vehicle · camera</dd>
+      <dt>M · R · H</dt><dd>Music · rain · hide HUD</dd>
+    </dl>
+    <button class="go" id="resume" type="button">Keep driving</button>
+  </div>
+  <div>
+    <div class="maplabel">Where you've been tonight</div>
+    <canvas class="bigmap" id="bigmap" aria-label="Map of your route tonight" width="1120" height="1120"></canvas>
+  </div>
+</div>
+
 <div class="intro" id="intro">
   <div class="intro-inner">
     <h1>Concrete<span>Nocturne</span></h1>
@@ -141,6 +175,7 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
       <dt>Shift</dt><dd>Drift</dd>
       <dt>V</dt><dd>Switch car / hoverboard / spaceship</dd>
       <dt>C · M · R · H</dt><dd>Camera · music · rain · hide HUD</dd>
+      <dt>Esc</dt><dd>Pause, and a map of where you've been</dd>
     </dl>
     <button class="go" id="go" type="button">Start the drive</button>
   </div>
@@ -1270,18 +1305,18 @@ const radio = {
     this.master = ctx.createGain(); this.master.gain.value = 0;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 3;
     this.master.connect(ctx.destination); comp.connect(this.master);
-    this.tape = ctx.createBiquadFilter(); this.tape.type = 'lowpass'; this.tape.frequency.value = 2600; this.tape.Q.value = 0.4; this.tape.connect(comp);
+    this.tape = ctx.createBiquadFilter(); this.tape.type = 'lowpass'; this.tape.frequency.value = 2000; this.tape.Q.value = 0.4; this.tape.connect(comp);
     this.music = ctx.createGain(); this.music.gain.value = this.musicOn ? 0.9 : 0; this.music.connect(this.tape);
     // reverb
     const len = ctx.sampleRate * 2.8, ir = ctx.createBuffer(2, len, ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let k = 0; k < len; k++) d[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / len, 2.6); }
-    const conv = ctx.createConvolver(); conv.buffer = ir; this.rev = ctx.createGain(); this.rev.gain.value = 0.55; this.rev.connect(conv); conv.connect(this.music);
+    const conv = ctx.createConvolver(); conv.buffer = ir; this.rev = ctx.createGain(); this.rev.gain.value = 0.72; this.rev.connect(conv); conv.connect(this.music);
     // tape echo
-    this.delay = ctx.createDelay(2); this.delay.delayTime.value = 60 / 104 * 0.75;
+    this.delay = ctx.createDelay(2); this.delay.delayTime.value = 60 / 84 * 0.75;
     const fb = ctx.createGain(); fb.gain.value = 0.38; const dlp = ctx.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 1800;
     this.delay.connect(dlp); dlp.connect(fb); fb.connect(this.delay); dlp.connect(this.music);
     // wobble
-    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.27; this.wob = ctx.createGain(); this.wob.gain.value = 9; lfo.connect(this.wob); lfo.start();
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.19; this.wob = ctx.createGain(); this.wob.gain.value = 16; /* slowed-tape warble */ lfo.connect(this.wob); lfo.start();
     // noise
     const nb = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), nd = nb.getChannelData(0);
     for (let k = 0; k < nd.length; k++) nd[k] = Math.random() * 2 - 1; this.noise = nb;
@@ -1371,15 +1406,14 @@ const radio = {
     this.full = true;   // rain, engine, hover hum and the rest are all in place
   },
   mtof: n => 440 * Math.pow(2, (n - 69) / 12),
-  prog: [
-    { notes: [52, 55, 59], root: 40 },   // Em
-    { notes: [48, 52, 55], root: 36 },   // C
-    { notes: [55, 59, 62], root: 43 },   // G
-    { notes: [50, 54, 57], root: 38 },   // D
-    { notes: [57, 60, 64], root: 45 },   // Am, now and then instead of G
+  prog: [   // D minor, i - iv - VI - v: it never gets home
+    { notes: [50, 53, 57], root: 38, riff: [74, 72, 69, 65] },   // Dm
+    { notes: [55, 58, 62], root: 43, riff: [74, 70, 67, 62] },   // Gm
+    { notes: [53, 58, 62], root: 34, riff: [74, 72, 70, 65] },   // Bb
+    { notes: [52, 57, 60], root: 33, riff: [72, 69, 64, 60] },   // Am
   ],
   schedule() {
-    const ctx = this.ctx, base = 60 / 104 / 4;                 // straight sixteenths, no swing: a drum machine
+    const ctx = this.ctx, base = 60 / 84 / 4;                  // slowed right down, straight time: a tired drum machine
     while (this.next < ctx.currentTime + 0.12) {
       this.play(this.step, this.next);
       this.next += base;
@@ -1387,41 +1421,49 @@ const radio = {
     }
   },
   play(s, t) {
-    // Doomer / cold-wave post-punk, and it still runs down with the night (d follows the windows going out):
-    // full band at 23:12, the guitar and hats drop out after 1 a.m., the drums by 3, and by 4 only the pad and the rain
-    const d = director.musicDensity, bar = Math.floor(s / 16), pos = s % 16, barDur = 60 / 104 * 4;
-    let ch = this.prog[bar % 4];
-    if (bar % 4 === 2 && bar % 16 >= 8) ch = this.prog[4];
+    // Slowed doomer post-punk, and it still runs down with the night (d follows the windows going out):
+    // everything at 23:12, the guitar, riff and hats drop out after 1 a.m., the drums by 3, and by 4 only the pad and the rain
+    const d = director.musicDensity, bar = Math.floor(s / 16), pos = s % 16, barDur = 60 / 84 * 4;
+    const ch = this.prog[bar % 4], phrase = Math.floor(bar / 4) % 4;
     const breath = bar % 16 === 15;                              // a bar where the drums hold their breath
     if (pos === 0 && bar % 2 === 0) this.music.gain.setTargetAtTime(this.musicOn ? 0.9 * (0.55 + 0.45 * d) : 0, t, 3);
-    // cold synth pad, the whole bar
-    if (pos === 0 && d > 0.18) this.pad(d > 0.3 ? ch.notes : [ch.notes[0], ch.notes[2]], t, barDur * 1.08, 0.028);
-    // bass guitar, driving eighths on the root with the odd octave jump
-    if (d > 0.3 && pos % 2 === 0 && (d > 0.45 || pos % 8 === 0)) this.bassPluck(ch.root + ((pos === 6 || pos === 14) && Math.random() < 0.5 ? 12 : 0), t);
-    // drum machine
+    // cold pad under everything
+    if (pos === 0 && d > 0.18) this.pad(d > 0.3 ? ch.notes : [ch.notes[0], ch.notes[2]], t, barDur * 1.1, 0.03);
+    // bass: heavy quarter notes, the odd octave on the last beat
+    if (d > 0.3 && pos % 4 === 0 && (d > 0.45 || pos === 0)) this.bassPluck(ch.root + (pos === 12 && Math.random() < 0.4 ? 12 : 0), t);
+    // half-time drum machine: kick on one, one big snare on three
     if (d > 0.45 && !breath) {
-      if (pos === 0 || pos === 8 || (pos === 10 && Math.random() < 0.4)) this.kick(t);
-      if (pos === 4 || pos === 12) this.snare(t);
-      if (d > 0.6 && pos % 2 === 0) this.hat(t, pos % 4 === 2 ? 0.03 : 0.018);
+      if (pos === 0 || (pos === 10 && Math.random() < 0.35)) this.kick(t);
+      if (pos === 8) this.snare(t);
+      if (d > 0.6 && pos % 4 === 2) this.hat(t, 0.016);
     }
-    // chorused guitar arpeggio, up an octave, into the echo
-    if (d > 0.55 && pos % 2 === 0 && Math.random() < 0.85) {
+    // the sad riff: four slow falling notes a bar, on every other four-bar phrase
+    if (d > 0.5 && phrase % 2 === 0 && pos % 4 === 0) this.riff(ch.riff[pos / 4], t);
+    // chorused guitar picking the chord, on the phrases in between
+    if (d > 0.55 && phrase % 2 === 1 && pos % 2 === 0 && Math.random() < 0.8) {
       const order = [0, 1, 2, 1, 0, 2, 1, 2];
       this.gtr(ch.notes[order[(pos / 2) % 8]] + 12, t);
     }
-    // a few long lead notes over the top
-    if (d > 0.35 && pos % 4 === 0 && Math.random() < 0.06 * d) {
-      const sc = [64, 66, 67, 69, 71, 74, 76]; this.lead(sc[Math.floor(Math.random() * sc.length)], t);
-    }
-    // near dawn: a single note from the pad's chord, left to ring
+    // near dawn: a single note from the chord, left to ring
     if (d <= 0.18 && pos === 0 && bar % 4 === 0 && Math.random() < 0.5) this.keys(ch.notes[Math.floor(Math.random() * 3)] + 12, t, 5, 0.04);
   },
-  bassPluck(n, t) { // two detuned saws through a closing filter: a chorused bass guitar
+  riff(n, t) { // a soft, slightly detuned synth lead with a long tail into the echo
     const ctx = this.ctx, f = ctx.createBiquadFilter(), g = ctx.createGain();
-    f.type = 'lowpass'; f.Q.value = 2; f.frequency.setValueAtTime(1300, t); f.frequency.exponentialRampToValueAtTime(420, t + 0.25);
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.13, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+    f.type = 'lowpass'; f.frequency.value = 1500;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.045, t + 0.03); g.gain.exponentialRampToValueAtTime(0.012, t + 0.5); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+    f.connect(g); g.connect(this.music); g.connect(this.rev); g.connect(this.delay);
+    for (const [type, det] of [['triangle', -5], ['sawtooth', 5]]) {
+      const o = ctx.createOscillator(); o.type = type; o.frequency.value = this.mtof(n); o.detune.value = det;
+      this.wob.connect(o.detune); o.connect(f); o.start(t); o.stop(t + 1.35);
+      o.onended = () => { try { this.wob.disconnect(o.detune); } catch (e) {} };
+    }
+  },
+  bassPluck(n, t) { // two detuned saws through a slowly closing filter: a heavy chorused bass
+    const ctx = this.ctx, f = ctx.createBiquadFilter(), g = ctx.createGain();
+    f.type = 'lowpass'; f.Q.value = 2; f.frequency.setValueAtTime(1000, t); f.frequency.exponentialRampToValueAtTime(320, t + 0.4);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.15, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.62);
     f.connect(g); g.connect(this.music);
-    for (const det of [-9, 9]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = this.mtof(n); o.detune.value = det; o.connect(f); o.start(t); o.stop(t + 0.36); }
+    for (const det of [-9, 9]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = this.mtof(n); o.detune.value = det; o.connect(f); o.start(t); o.stop(t + 0.65); }
   },
   pad(notes, t, dur, vel) { // cold, wide, slow to arrive
     const ctx = this.ctx, f = ctx.createBiquadFilter(), g = ctx.createGain();
@@ -1638,6 +1680,8 @@ const radio = {
 const keys = { up: false, down: false, left: false, right: false, brake: false, boost: false };
 const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right', Space: 'boost', ShiftLeft: 'brake', ShiftRight: 'brake' };
 addEventListener('keydown', e => {
+  if ((e.code === 'Escape' || e.code === 'KeyP') && started && !e.repeat) { setPaused(!paused); e.preventDefault(); return; }
+  if (paused) return;
   if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); }
   if (e.repeat) return;
   if (e.code === 'KeyM') toggleMusic(); else if (e.code === 'KeyR') toggleRain(); else if (e.code === 'KeyC') cycleCam(); else if (e.code === 'KeyV') toggleVehicle();
@@ -1681,7 +1725,19 @@ function start() {
 }
 $('go').onclick = start;
 // Browsers (Safari especially) pause a page's audio when you switch tabs or apps. Wake it on the next touch or key.
-function wakeAudio() { const c = radio.ctx; if (c && c.state !== 'running' && c.resume) c.resume().catch(() => {}); }
+function wakeAudio() { const c = radio.ctx; if (!paused && c && c.state !== 'running' && c.resume) c.resume().catch(() => {}); }
+// Pause: the world, the clock and the sound all stop; the pause screen shows the map of your route
+let paused = false;
+function setPaused(p) {
+  if (!started) return;
+  paused = p; $('pause').hidden = !p;
+  for (const k in keys) keys[k] = false;
+  if (radio.ctx) { if (p) radio.ctx.suspend().catch(() => {}); else wakeAudio(); }
+  if (p) drawBigMap();
+}
+$('bPause').onclick = () => setPaused(true);
+$('resume').onclick = () => setPaused(false);
+document.addEventListener('visibilitychange', () => { if (document.hidden && started && !paused) setPaused(true); }); // leaving the tab pauses the drive
 for (const ev of ['pointerdown', 'keydown', 'touchend']) addEventListener(ev, () => { if (started) wakeAudio(); }, true);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && started) wakeAudio(); });
 
@@ -1880,12 +1936,76 @@ function updateHud(elapsed) {
   $('clock').textContent = String(Math.floor(mins / 60)).padStart(2, '0') + ':' + String(mins % 60).padStart(2, '0');
 }
 
+/* ---------- map ---------- */
+// Blocks tinted by zone, your route as a faint sodium line. Moments are never shown: they stay surprises.
+const ZONE_TINT = { corridor: '#33363d', boulevard: '#3c3933', plaza: '#24272b', interchange: '#383742', residential: '#3a3632', corner: '#4b3d2b', fog: '#20242b' };
+const route = [], visitedDistricts = new Map();
+function mapRecord() {
+  const last = route[route.length - 1];
+  if (!last || Math.hypot(car.pos.x - last[0], car.pos.z - last[1]) > 15) { route.push([car.pos.x, car.pos.z]); if (route.length > 6000) route.shift(); }
+  const di = districtOf(Math.floor(car.pos.x / C)), dj = districtOf(Math.floor(car.pos.z / C)), k = di + ',' + dj;
+  if (!visitedDistricts.has(k)) {
+    const zone = districtZones.get(k); if (!zone) return;
+    const names = ZONE_NAMES[zone], h = hash2(di, dj, 3);
+    visitedDistricts.set(k, { name: names[h % names.length], x: (di * 3 + 1.5) * C, z: (dj * 3 + 1.5) * C });
+  }
+}
+function drawMap(ctx, w, h, cx, cz, scale, rot) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#090b0e'; ctx.fillRect(0, 0, w, h);                        // the roads are the dark between the blocks
+  ctx.save(); ctx.translate(w / 2, h / 2); ctx.rotate(rot); ctx.scale(scale, scale); ctx.translate(-cx, -cz);
+  const rad = Math.hypot(w, h) / 2 / scale, i0 = Math.floor((cx - rad) / C), i1 = Math.floor((cx + rad) / C), j0 = Math.floor((cz - rad) / C), j1 = Math.floor((cz + rad) / C);
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+    const zone = districtZones.get(districtOf(i) + ',' + districtOf(j));
+    ctx.fillStyle = zone ? ZONE_TINT[zone] : '#15171b';
+    ctx.fillRect(i * C + A - 2, j * C + A - 2, B - A + 4, B - A + 4);
+  }
+  if (route.length > 1) {
+    ctx.strokeStyle = 'rgba(255,138,58,0.6)'; ctx.lineWidth = 2.2 / scale * (w / 300); ctx.lineJoin = ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(route[0][0], route[0][1]);
+    for (let k = 1; k < route.length; k++) ctx.lineTo(route[k][0], route[k][1]);
+    ctx.lineTo(car.pos.x, car.pos.z); ctx.stroke();
+  }
+  ctx.restore();
+}
+function carMarker(ctx, x, y, ang, size) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+  ctx.fillStyle = '#ece6dc'; ctx.beginPath(); ctx.moveTo(0, -size); ctx.lineTo(size * 0.62, size * 0.75); ctx.lineTo(0, size * 0.38); ctx.lineTo(-size * 0.62, size * 0.75); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+const miniCtx = $('minimap').getContext('2d');
+function drawMiniMap() {  // turns with the car: up is always the way you're facing
+  const cv = $('minimap'), w = cv.width, h = cv.height, scale = w / 520;
+  drawMap(miniCtx, w, h, car.pos.x, car.pos.z, scale, car.heading);
+  carMarker(miniCtx, w / 2, h / 2, 0, w * 0.035);
+  miniCtx.fillStyle = 'rgba(236,230,220,.6)'; miniCtx.font = `600 ${Math.round(w * 0.06)}px "IBM Plex Mono",monospace`; miniCtx.textAlign = 'center'; miniCtx.textBaseline = 'middle';
+  const r0 = w * 0.42; miniCtx.fillText('N', w / 2 + Math.sin(car.heading) * r0, h / 2 - Math.cos(car.heading) * r0);
+}
+function drawBigMap() {   // north up, the whole route tonight, and the names of the places you passed through
+  const cv = $('bigmap'), ctx = cv.getContext('2d'), w = cv.width, h = cv.height;
+  let x0 = car.pos.x, x1 = car.pos.x, z0 = car.pos.z, z1 = car.pos.z;
+  for (const [x, z] of route) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+  const span = Math.max(1200, (x1 - x0) * 1.2, (z1 - z0) * 1.2), scale = w / span, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  drawMap(ctx, w, h, cx, cz, scale, 0);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `500 ${Math.round(w * 0.019)}px "IBM Plex Mono",monospace`;
+  for (const d of visitedDistricts.values()) {
+    const sx = (d.x - cx) * scale + w / 2, sy = (d.z - cz) * scale + h / 2;
+    if (sx < 0 || sy < 0 || sx > w || sy > h) continue;
+    ctx.fillStyle = 'rgba(9,11,14,.7)'; const tw = ctx.measureText(d.name).width; ctx.fillRect(sx - tw / 2 - 6, sy - w * 0.014, tw + 12, w * 0.028);
+    ctx.fillStyle = 'rgba(236,230,220,.82)'; ctx.fillText(d.name, sx, sy);
+  }
+  carMarker(ctx, (car.pos.x - cx) * scale + w / 2, (car.pos.z - cz) * scale + h / 2, -car.heading, w * 0.018);
+  ctx.fillStyle = 'rgba(236,230,220,.6)'; ctx.font = `600 ${Math.round(w * 0.024)}px "IBM Plex Mono",monospace`; ctx.fillText('N', w / 2, w * 0.03);
+}
+
 /* ---------- loop ---------- */
 const clock = new THREE.Clock();
 let elapsed = 0, hudTick = 0;
 function frame() {
   requestAnimationFrame(frame);
-  const dt = Math.min(clock.getDelta(), 0.05); elapsed += dt;
+  const dt0 = Math.min(clock.getDelta(), 0.05);
+  if (paused) return;                                   // nothing moves; the last frame stays on screen
+  const dt = dt0; elapsed += dt;
   if (started) { drive(dt); directorTick(dt); momentsTick(dt, elapsed); }
   NIGHT.value = director.litFraction;
   updateCells(); pumpCells(started ? 2 : 4);
@@ -1999,7 +2119,8 @@ function frame() {
     wasOnStripe = onStripe;
   }
 
-  if ((hudTick += dt) > 0.1) { hudTick = 0; updateHud(elapsed); }
+  if ((hudTick += dt) > 0.1) { hudTick = 0; updateHud(elapsed); if (started) mapRecord(); }
+  drawMiniMap();
   if (composer) { lofiPass.uniforms.time.value = elapsed; composer.render(); } else renderer.render(scene, camera);
 }
 

@@ -21,6 +21,10 @@ the city is simply not for you.
 | V | Switch vehicle: car → hoverboard → spaceship |
 | C | Camera: chase → cinematic → hood |
 | M · R · H | Music · rain · hide HUD |
+| Esc / P | Pause, with a map of where you've been tonight |
+
+A small map in the top-right corner turns with the car (up is the way you're facing) and shows the
+blocks tinted by zone and your route. Moments never appear on either map.
 
 On a phone, touch buttons replace the keys.
 
@@ -63,9 +67,10 @@ about to appear ahead. It only counts once you have passed it; turn away and it 
 
 ## Sound
 
-- **Radio Panelka (88.4 FM):** slowed cold-wave post-punk in E minor: drum machine, driving bass,
-  a cold pad and a chorused guitar, drowned in reverb. Guitar and hats drop out after about 1 a.m.,
-  drums by 3, and by 4 there is mostly just the rain.
+- **Radio Panelka (88.4 FM):** slowed doomer post-punk at 84 BPM in D minor (Dm, Gm, B♭, Am): a tired
+  half-time drum machine, heavy bass, a cold pad, a slow falling synth riff that comes and goes, and a
+  chorused guitar, drowned in reverb with a warbling tape. The riff, guitar and hats drop out after
+  about 1 a.m., drums by 3, and by 4 there is mostly just the rain.
 - **Inside the car:** rain on the roof, spray off wet tyres, the wipers.
 - **Far away:** a siren, a train horn, a dog, wind between the towers, thunder. One at a time.
 - If the browser pauses the sound (Safari does when you switch tabs), any click or key wakes it.
