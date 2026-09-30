@@ -22,6 +22,7 @@ the city is simply not for you.
 | C | Camera: chase → cinematic → hood |
 | M · R · H | Music · rain · hide HUD |
 | Esc / P | Pause, with a map of where you've been tonight |
+| T | Night or day: the same city under a pale, hazy afternoon sky, lamps and windows off |
 
 A small map in the top-right corner turns with the car (up is the way you're facing) and shows the
 blocks tinted by zone and your route. Moments never appear on either map.
@@ -30,7 +31,8 @@ On a phone, touch buttons replace the keys.
 
 ## How the city works
 
-The city is endless and built block by block around the car (90 m blocks, 3×3 blocks to a district).
+The city is endless and built block by block around the car (90 m blocks, 12×12 blocks to a district,
+so each zone lasts about 30–50 seconds of driving).
 A small **director** decides what each new district becomes and when something happens.
 
 **Zones.** Each district gets one zone the first time it comes into view. The district you are driving
@@ -79,7 +81,8 @@ about to appear ahead. It only counts once you have passed it; turn away and it 
 ## The car
 
 A white Soviet-era saloon: boxy, chrome bumpers, four round headlamps. Its cabin glows warm, the one
-refuge in the city. Hoverboard and compact spaceship are there too (V).
+refuge in the city. The hoverboard and compact spaceship (V) share its look: off-white enamel, grey and
+chrome, a red stripe, and warm amber glow instead of neon.
 
 ## Files
 
