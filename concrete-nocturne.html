@@ -138,6 +138,8 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
   <div class="pad">
     <button class="tb" data-k="left" type="button" aria-label="Steer left">◀</button>
     <button class="tb" data-k="right" type="button" aria-label="Steer right">▶</button>
+    <button class="tb" data-k="rise" type="button" aria-label="Climb (spaceship)">Up</button>
+    <button class="tb" data-k="sink" type="button" aria-label="Descend (spaceship)">Down</button>
   </div>
   <div class="pad">
     <button class="tb" data-k="boost" type="button">Boost</button>
@@ -155,6 +157,7 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
       <dt>Esc / P</dt><dd>Keep driving</dd>
       <dt>W A S D</dt><dd>Drive, steer</dd>
       <dt>Space · Shift</dt><dd>Booster · drift</dd>
+      <dt>Q · E</dt><dd>Climb · descend (spaceship)</dd>
       <dt>V · C</dt><dd>Vehicle · camera</dd>
       <dt>M · R · H</dt><dd>Music · rain · hide HUD</dd>
       <dt>T</dt><dd>Night or day</dd>
@@ -176,6 +179,7 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
       <dt>S / ↓</dt><dd>Brake, reverse</dd>
       <dt>A D / ← →</dt><dd>Steer</dd>
       <dt>Space</dt><dd>Booster</dd>
+      <dt>Q · E</dt><dd>Climb · descend, in the spaceship</dd>
       <dt>Shift</dt><dd>Drift</dd>
       <dt>V</dt><dd>Switch car / hoverboard / spaceship</dd>
       <dt>C · M · R · H</dt><dd>Camera · music · rain · hide HUD</dd>
@@ -517,6 +521,7 @@ function genCell(i, j) {
   const li = i - di * DS, lj = j - dj * DS;                                     // this block's place inside its district
   const rnd = mulberry(hash2(i, j, 7)), zr = mulberry(hash2(di, dj, 13));    // zr gives every block in a district the same numbers
   const bk = {}, grp = new THREE.Group(), geos = [], signMats = [], flick = [];
+  const solids = [];                                                           // boxes in block coordinates, for flight collision
   grp.position.set(i * C, 0, j * C);
   const mom = moments.cache.get(i + ',' + j), extras = [], ticks = [];   // this block's moment, if the director gave it one
   let momentPos = null;
@@ -534,7 +539,7 @@ function genCell(i, j) {
     roofs.push({ x, z, w, d, y: base + h });
   };
   let ph = 1, signChance = 0, lampOn = 0.7;
-  const plinth = h => { ph = h; addBox(bk, 'concrete', 'roof', L, ph, L, mid, ph / 2, mid, rnd); }; // fills the lot; also the collision box
+  const plinth = h => { ph = h; addBox(bk, 'concrete', 'roof', L, ph, L, mid, ph / 2, mid, rnd); solids.push({ x0: A, x1: B, z0: A, z1: B, y0: 0, y1: ph }); }; // fills the lot; also the collision box
 
   if (zone === 'corridor') {
     // P5 + P11: the same twin slabs block after block, one lit sky bridge between them that nobody crosses
@@ -544,6 +549,7 @@ function genCell(i, j) {
     for (const a of [A + 1 + sw / 2, B - 1 - sw / 2]) tower(key, alongX ? sw : sl, h, alongX ? sl : sw, alongX ? a : mid, alongX ? mid : a, ph, same);
     const litBridge = mom && mom.type === 'bridge';
     [b1, b2].forEach((by, n) => addBox(bk, litBridge && n === 0 ? 'bridge' : 'bridgeDim', 'roof', alongX ? gap + 2 : 9, 4.5, alongX ? 9 : gap + 2, mid, by, mid)); // P11: links nobody uses
+    for (const by of [b1, b2]) { const hx = alongX ? gap / 2 + 1 : 4.5, hz = alongX ? 4.5 : gap / 2 + 1; solids.push({ x0: mid - hx, x1: mid + hx, z0: mid - hz, z1: mid + hz, y0: by - 2.25, y1: by + 2.25 }); }
     if (litBridge) momentPos = new THREE.Vector3(i * C + mid, b1, j * C + mid);
     lampOn = 0.75;
   } else if (zone === 'boulevard') {
@@ -554,6 +560,7 @@ function genCell(i, j) {
       addBox(bk, 'pole', 'pole', 0.7, 9, 0.7, mid, ph + 4.5, mid);
       const am = new THREE.MeshBasicMaterial({ map: adTex[Math.floor(rnd() * adTex.length)], color: 0x9c9890 });
       const ag = new THREE.BoxGeometry(5, 7.5, 5), ad = new THREE.Mesh(ag, am); ad.position.set(mid, ph + 12.75, mid); grp.add(ad);
+      solids.push({ x0: mid - 2.5, x1: mid + 2.5, z0: mid - 2.5, z1: mid + 2.5, y0: ph + 9, y1: ph + 16.5 });
       signMats.push(am); extras.push(ag);
       if (rnd() < 0.4) flick.push({ m: am, seed: rnd() * 100, mode: rnd() < 0.5 ? 'dead' : 'flick' });
     }
@@ -575,6 +582,7 @@ function genCell(i, j) {
     if (li === DS >> 1 && lj === DS >> 1) {
       addBox(bk, 'concrete', 'roof', 22, 3, 22, mid, ph + 1.5, mid);
       addBox(bk, 'concrete', 'roof', 12, 150, 12, mid, ph + 3 + 75, mid);   // P1: its top is lost in the haze
+      solids.push({ x0: mid - 6, x1: mid + 6, z0: mid - 6, z1: mid + 6, y0: 0, y1: ph + 153 });
       addBox(bk, 'pole', 'pole', 0.3, 9, 0.3, mid + 14, ph + 4.5, mid + 14);
       addBox(bk, 'lamp', 'lamp', 0.7, 0.25, 0.7, mid + 14, ph + 9, mid + 14);
       addFlat(bk, 'glow', mid + 14, mid + 14, 22, ph + 0.03);
@@ -596,6 +604,10 @@ function genCell(i, j) {
       const a0 = lk === 0 ? A : 0, a1 = lk === DS - 1 ? B : C, len = a1 - a0, am = (a0 + a1) / 2;
       const bx = (along, h, across, a, yy, b2, key = 'concrete', top = 'roof') => alongX ? addBox(bk, key, top, along, h, across, a, yy, b2) : addBox(bk, key, top, across, h, along, b2, yy, a);
       bx(len, 1.4, 14, am, y, mid);                                                      // deck
+      const box3 = (a0b, a1b, c0, c1, y0, y1) => solids.push(alongX ? { x0: a0b, x1: a1b, z0: c0, z1: c1, y0, y1 } : { x0: c0, x1: c1, z0: a0b, z1: a1b, y0, y1 });
+      box3(a0, a1, mid - 7, mid + 7, y - 0.7, y + 1.8);
+      if (lk === 0) box3(A, A + 16, mid - 9, mid + 9, 0, y + 5);
+      if (lk === DS - 1) box3(B - 16, B, mid - 9, mid + 9, 0, y + 5);
       bx(len, 1.1, 0.3, am, y + 1.25, mid - 6.85, 'concrete', 'concrete');                // barriers
       bx(len, 1.1, 0.3, am, y + 1.25, mid + 6.85, 'concrete', 'concrete');
       for (const ca of [A + 8, B - 8]) if (ca > a0 && ca < a1) bx(3, y - ph, 3, ca, ph + (y - ph) / 2, mid, 'concrete', 'concrete');
@@ -764,10 +776,12 @@ function genCell(i, j) {
   for (const q of [R + 10, R + 36, R + 62]) { lamp(R + 0.8, q, -1, 0); lamp(q, R + 0.8, 0, -1); }
 
   if (mom) momentPos = buildMoment(mom, { i, j, bk, grp, rnd, ph, mid, facades, extras, ticks, solo }) || momentPos;
+  for (const f of facades) solids.push({ x0: f.x0, x1: f.x1, z0: f.z0, z1: f.z1, y0: 0, y1: f.y1 });
+  for (const q of roofs) solids.push({ x0: q.x - q.w / 2, x1: q.x + q.w / 2, z0: q.z - q.d / 2, z1: q.z + q.d / 2, y0: 0, y1: q.y });
 
   flush(bk, grp, geos);
   scene.add(grp);
-  return { grp, geos, signMats, flick, zone, extras, momentPos, tick: ticks.length ? (dt, t) => ticks.forEach(f => f(dt, t)) : null };
+  return { grp, geos, signMats, flick, zone, extras, momentPos, solids, tick: ticks.length ? (dt, t) => ticks.forEach(f => f(dt, t)) : null };
 }
 function disposeCell(c) {
   scene.remove(c.grp); c.geos.forEach(g => g.dispose()); c.signMats.forEach(m => m.dispose()); c.extras.forEach(x => x.dispose());
@@ -1034,7 +1048,7 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(C * 24, C * 24), groundMat
 ground.rotation.x = -Math.PI / 2; scene.add(ground);
 
 /* ---------- car ---------- */
-const car = { boost: 1, boosting: 0, pos: new THREE.Vector3(C + R / 2 + 3, 0, (DS - 1) * C + 40), heading: 0, speed: 0, vel: new THREE.Vector3(), steer: 0, bump: 0, drift: 0 };
+const car = { alt: 0, vy: 0, boost: 1, boosting: 0, pos: new THREE.Vector3(C + R / 2 + 3, 0, (DS - 1) * C + 40), heading: 0, speed: 0, vel: new THREE.Vector3(), steer: 0, bump: 0, drift: 0 };
 const carMesh = new THREE.Group(); scene.add(carMesh);
 const frontWheels = [], flames = [], wheelRings = [];
 let boostLight = null;
@@ -1683,8 +1697,8 @@ const radio = {
 };
 
 /* ---------- input ---------- */
-const keys = { up: false, down: false, left: false, right: false, brake: false, boost: false };
-const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right', Space: 'boost', ShiftLeft: 'brake', ShiftRight: 'brake' };
+const keys = { up: false, down: false, left: false, right: false, brake: false, boost: false, rise: false, sink: false };
+const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyQ: 'rise', KeyE: 'sink', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right', Space: 'boost', ShiftLeft: 'brake', ShiftRight: 'brake' };
 addEventListener('keydown', e => {
   if ((e.code === 'Escape' || e.code === 'KeyP') && started && !e.repeat) { setPaused(!paused); e.preventDefault(); return; }
   if (paused) return;
@@ -1738,6 +1752,7 @@ let camMode = 0;
 function cycleCam() { camMode = (camMode + 1) % CAMS.length; $('bCam').innerHTML = `Camera: ${CAMS[camMode]}<kbd>C</kbd>`; $('bCam').classList.toggle('on', camMode !== 0); }
 function toggleVehicle() {
   vehicle = { car: 'board', board: 'ship', ship: 'car' }[vehicle];
+  car.alt = 0; car.vy = 0;                                    // only the spaceship leaves the ground
   if (vehicle === 'car') { car.gear = 1; car.rpm = IDLE; }
   $('bVeh').innerHTML = `Vehicle: ${{ car: 'car', board: 'hoverboard', ship: 'spaceship' }[vehicle]}<kbd>V</kbd>`; $('bVeh').classList.toggle('on', vehicle !== 'car');
 }
@@ -1834,7 +1849,15 @@ function drive(dt) {
     const vl = car.vel.length(); car.slip = vl > 6 ? 1 - Math.abs(car.vel.dot(fwd)) / vl : 0; car.drift = car.slip;
     car.accel += ((car.speed - prevSpeed) / Math.max(dt, 1e-4) - car.accel) * Math.min(1, dt * 8);
     car.yaw = (car.heading - prevHeading) / Math.max(dt, 1e-4);
-    collide(); return;
+    if (vehicle === 'ship') {
+      // flight: Q climbs, E descends, let go and it holds its height
+      const want = (keys.rise ? 1 : 0) - (keys.sink ? 1 : 0);
+      car.vy += (want * 22 - car.vy) * Math.min(1, dt * 2.5);
+      car.alt = clamp(car.alt + car.vy * dt, 0, 420);
+      if ((car.alt === 0 && car.vy < 0) || (car.alt === 420 && car.vy > 0)) car.vy = 0;
+      collideAir();
+    } else collide();
+    return;
   }
   if (typeof car.gear !== 'number') car.gear = 1;
   // gearbox
@@ -1894,6 +1917,30 @@ function suspension(dt) {
   [car.roll, car.rollV] = spring(car.roll, car.rollV, clamp(-car.yaw * car.speed * 0.0022, -0.07, 0.07), 70, 9, dt);
   [car.heave, car.heaveV] = spring(car.heave, car.heaveV, 0, 160, 12, dt);
 }
+// Flying: the towers, bridges, decks and monuments are solid. Walls push you away; come down on a roof and you land on it.
+function collideAir() {
+  const r = 2.1, y = car.alt + 1.35;
+  const i0 = Math.floor((car.pos.x - r) / C), i1 = Math.floor((car.pos.x + r) / C), j0 = Math.floor((car.pos.z - r) / C), j1 = Math.floor((car.pos.z + r) / C);
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+    const c = cells.get(i + ',' + j); if (!c || !c.solids) continue;
+    for (const b of c.solids) {
+      const x0 = i * C + b.x0 - r, x1 = i * C + b.x1 + r, z0 = j * C + b.z0 - r, z1 = j * C + b.z1 + r;
+      if (car.pos.x <= x0 || car.pos.x >= x1 || car.pos.z <= z0 || car.pos.z >= z1 || y <= b.y0 - 1 || y >= b.y1 + 1.2) continue;
+      const pens = [car.pos.x - x0, x1 - car.pos.x, car.pos.z - z0, z1 - car.pos.z, b.y1 + 1.2 - y, y - (b.y0 - 1)];
+      let m = 0; for (let k = 1; k < 6; k++) if (pens[k] < pens[m]) m = k;
+      if (m === 4) { car.alt += pens[4]; if (car.vy < 0) car.vy = 0; continue; }   // settle onto the roof
+      if (m === 5) { car.alt = Math.max(0, car.alt - pens[5]); if (car.vy > 0) car.vy = 0; car.bump = Math.max(car.bump, 0.3); continue; } // bump your roof on a bridge or deck
+      const n = [[-1, 0], [1, 0], [0, -1], [0, 1]][m];
+      car.pos.x += n[0] * pens[m]; car.pos.z += n[1] * pens[m];
+      const vn = car.vel.x * n[0] + car.vel.z * n[1];
+      if (vn < 0) {
+        car.vel.x -= n[0] * vn * 1.25; car.vel.z -= n[1] * vn * 1.25; car.vel.multiplyScalar(0.8);
+        car.speed = car.vel.dot(fwd);
+        const hit = Math.min(1, -vn / 20); if (hit > 0.15) { car.bump = Math.max(car.bump, hit); radio.thump(hit); }
+      }
+    }
+  }
+}
 function collide() {
   const r = 1.7, i = Math.floor(car.pos.x / C), j = Math.floor(car.pos.z / C);
   const lx = car.pos.x - i * C, lz = car.pos.z - j * C;
@@ -1928,9 +1975,9 @@ function updateCamera(dt, t) {
     look.copy(car.pos).addScaledVector(fwd, 30); look.y = 1.2; camera.lookAt(look);
   } else {
     const dist = camMode === 0 ? ({ board: 7.5, ship: 9 }[vehicle] || 9) : 22, h = camMode === 0 ? ({ board: 3.2, ship: 3.9 }[vehicle] || 3.2) : 11;
-    camWant.copy(car.pos).addScaledVector(fwd, -dist); camWant.y = h;
+    camWant.copy(car.pos).addScaledVector(fwd, -dist); camWant.y = h + car.alt;
     camera.position.lerp(camWant, 1 - Math.exp(-((camMode === 0 ? 4.5 : 1.8) + Math.abs(car.speed) * 0.06) * dt));
-    camTarget.copy(car.pos).addScaledVector(fwd, camMode === 0 ? 6 : 2); camTarget.y = camMode === 0 ? 1.4 : 3;
+    camTarget.copy(car.pos).addScaledVector(fwd, camMode === 0 ? 6 : 2); camTarget.y = (camMode === 0 ? 1.4 : 3) + car.alt;
     look.lerp(camTarget, 1 - Math.exp(-8 * dt)); camera.lookAt(look);
   }
   if (car.bump > 0) {
@@ -1950,7 +1997,7 @@ function updateHud(elapsed) {
     const label = st || 'Music';
     if ($('bMusic').dataset.label !== label) { $('bMusic').dataset.label = label; $('bMusic').innerHTML = `${label}<kbd>M</kbd>`; }
   }
-  $('gear').textContent = vehicle === 'board' ? 'HOVER' : vehicle === 'ship' ? 'FLIGHT' : car.speed < -0.5 ? 'R' : car.gear;
+  $('gear').textContent = vehicle === 'board' ? 'HOVER' : vehicle === 'ship' ? (car.alt > 3 ? 'ALT ' + Math.round(car.alt) + ' m' : 'FLIGHT') : car.speed < -0.5 ? 'R' : car.gear;
   $('tachFill').style.transform = `scaleX(${(car.rpm / REDLINE).toFixed(3)})`;
   $('tachFill').parentNode.classList.toggle('red', car.rpm > 6300);
   $('boostFill').style.transform = `scaleX(${car.boost.toFixed(3)})`;
@@ -2068,11 +2115,11 @@ function frame() {
   }
   if (vehicle === 'ship') {
     const hover = 1.35 + Math.sin(elapsed * 1.7) * 0.1 + Math.sin(elapsed * 0.6) * 0.05;
-    shipMesh.position.set(car.pos.x, hover + car.heave, car.pos.z);
+    shipMesh.position.set(car.pos.x, car.alt + hover + car.heave, car.pos.z);
     shipMesh.rotation.set(0, car.heading, 0);
-    shipMesh.rotateX(clamp(-car.accel * 0.005, -0.1, 0.1) + Math.sin(elapsed * 1.2) * 0.015);
+    shipMesh.rotateX(clamp(-car.accel * 0.005, -0.1, 0.1) + clamp(car.vy * 0.016, -0.32, 0.32) + Math.sin(elapsed * 1.2) * 0.015); // nose up to climb
     shipMesh.rotateZ(clamp(-car.yaw * car.speed * 0.012, -0.6, 0.6) + Math.sin(elapsed * 1.0) * 0.02);
-    ship.glow.position.set(0, -hover + 0.07, 0); ship.glow.rotation.set(-Math.PI / 2 - shipMesh.rotation.x, 0, 0);
+    ship.glow.visible = car.alt < 6; ship.glow.position.set(0, -hover - car.alt + 0.07, 0); ship.glow.rotation.set(-Math.PI / 2 - shipMesh.rotation.x, 0, 0);
     const pulse = 0.75 + 0.25 * Math.sin(elapsed * 4), amt = 0.5 + car.throttle * 0.4 + car.boosting * 0.8, j = 0.9 + Math.random() * 0.2;
     ship.ports.forEach(p => p.material.color.setRGB(1, 0.55 + car.boosting * 0.3, 0.2 + car.boosting * 0.4));
     ship.portGlows.forEach(g => { g.material.opacity = Math.min(1, amt) * j; g.scale.setScalar(0.8 + amt * 1.1 * j); g.material.color.setRGB(1, 0.55 + car.boosting * 0.3, 0.2 + car.boosting * 0.4); });
@@ -2140,7 +2187,7 @@ function frame() {
     radio.engine(car, !inCross, vehicle === 'car' ? null : vehicle);
     // lamp posts every 26 m along both road axes: whoosh as they pass
     const cellX = Math.floor(car.pos.x / 26), cellZ = Math.floor(car.pos.z / 26);
-    if ((cellX !== lastLampX || cellZ !== lastLampZ) && Math.abs(car.speed) > 14) {
+    if ((cellX !== lastLampX || cellZ !== lastLampZ) && Math.abs(car.speed) > 14 && car.alt < 10) {
       const pan = lx < R ? (car.vel.z < 0 ? 0.6 : -0.6) : (car.vel.x > 0 ? 0.6 : -0.6);
       radio.whoosh(Math.min(1, Math.abs(car.speed) / 50), pan);
     }

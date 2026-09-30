@@ -17,6 +17,7 @@ the city is simply not for you.
 | S / ↓ | Brake, reverse |
 | A D / ← → | Steer |
 | Space | Booster |
+| Q · E | Climb · descend (spaceship only; up to about 420 m, it holds height when you let go) |
 | Shift | Drift |
 | V | Switch vehicle: car → hoverboard → spaceship |
 | C | Camera: chase → cinematic → hood |
