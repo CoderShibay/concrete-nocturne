@@ -32,8 +32,19 @@ On a phone, touch buttons replace the keys.
 
 ## How the city works
 
-The city is endless and built block by block around the car (90 m blocks, 12×12 blocks to a district,
-so each zone lasts about 30–50 seconds of driving).
+The city is endless and built block by block around the car (100 m blocks with 30 m, six-lane roads;
+12×12 blocks to a district, so each zone lasts about 30–50 seconds of driving). Buildings stand 7 m back
+inside their lots, so there is a drivable apron of paving around them, and empty lots are open ground.
+
+**Structures:** a low metro line runs over the road of every seventh row and a high line over every ninth
+column, with long lit trains; some roads pass under buildings (underpasses) or under lit footbridges; some
+towers stand on columns with a drivable car park underneath; some blocks have a lit ramp down to an
+underground car park (to look into only). There is exactly one gas station in the whole city, on the first
+road you drive.
+
+**The chase:** every couple of minutes a lone car appears ahead and drives off through the city. It waits if
+you fall back and runs if you close in; it shows as a red dot on the map. Stay right behind it for a moment
+and it pulls over, its lights go out, and nobody is inside.
 A small **director** decides what each new district becomes and when something happens.
 
 **Zones.** Each district gets one zone the first time it comes into view. The district you are driving
