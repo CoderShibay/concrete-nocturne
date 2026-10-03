@@ -206,7 +206,11 @@ const C = 100;          // city block pitch (m)
 const R = 30;           // road width: about six lanes, room to turn and drift at speed
 const SW = 4;           // sidewalk width
 const A = R + SW, B = C - SW;   // the lot, between the sidewalks
-const LOT_A = A, LOT_B = B, INSET = 7;   // buildings stand INSET metres inside the lot; the apron around them is drivable
+const LOT_A = A, LOT_B = B, INSET = 7;
+const GAS = { i: 1, j: 6 };                     // the one gas station in the whole city, on the first road you drive
+const mod = (a, n) => ((a % n) + n) % n;
+const metroOnX = j => mod(j, 7) === 3;          // rows whose x-road carries the low metro line (deck at 9.5 m)
+const metroOnZ = i => mod(i, 9) === 5;          // columns whose z-road carries the high line (deck at 40 m)   // buildings stand INSET metres inside the lot; the apron around them is drivable
 const VIEW = 3;         // cells loaded around the car
 const TEX_W = 24, TEX_H = 51.2; // metres covered by one facade texture tile
 const NEON = [0xff2e97, 0x22e6ff, 0x9d5cff, 0xffb03a, 0x4dffc3];
@@ -375,6 +379,10 @@ const mats = {
   glow: glowMat(0xff8a2a, 0.72),
   glowv: glowMat(0x7fcf9a, 0.32),
   glowd: glowMat(0x8fe0a4, 0.6),
+  glowf: glowMat(0xd6ecd0, 0.26),                                          // fluorescent spill: car parks, underpasses
+  glowg: glowMat(0xf2f6ff, 0.5),                                           // the gas station canopy
+  gasWhite: new THREE.MeshStandardMaterial({ color: 0xd4d0c4, roughness: 0.6, emissive: 0x141410, emissiveIntensity: 0.4 }),
+  gasRed: new THREE.MeshStandardMaterial({ color: 0x8e2a21, roughness: 0.5, emissive: 0x2a0806, emissiveIntensity: 0.7 }),
   beacon: new THREE.MeshBasicMaterial({ color: 0xff2040 }),
 };
 NEON.forEach((c, k) => { mats['neon' + k] = new THREE.MeshBasicMaterial({ color: c }); });
@@ -385,6 +393,15 @@ const uvFor = k => k.startsWith('win') ? [TEX_W, TEX_H] : (UV[k] || [4, 4]);
 const V_SIGNS = ['夜市', '無限', '電脳', '酒場', 'ホテル', 'ラーメン', '喫茶', '静寂'];
 const H_SIGNS = ['NOCTURNE', 'RAMEN 24H', 'HOTEL VOID', 'ARCADE', 'LOW TIDE', 'CONCRETE FM', 'NOODLE BAR', 'NO VACANCY'];
 let vSignTex = [], hSignTex = [], roadSignMats = [], adTex = [], openTex = null;
+const gasSignTex = (() => {
+  const W = 256, H = 320, c = mkCanvas(W, H), x = c.getContext('2d');
+  x.fillStyle = '#e9e5da'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#8e2a21'; x.fillRect(0, 0, W, 110);
+  x.fillStyle = '#f4efe4'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = '700 76px "Helvetica Neue",Arial,sans-serif'; x.fillText('GAS', W / 2, 58);
+  x.fillStyle = '#26221e'; x.font = '600 30px "IBM Plex Mono",monospace'; x.textAlign = 'left';
+  [['92', '1.89'], ['95', '1.97'], ['DSL', '1.79']].forEach(([a, b], k) => { x.fillText(a, 24, 150 + k * 52); x.textAlign = 'right'; x.fillText(b, W - 24, 150 + k * 52); x.textAlign = 'left'; });
+  const t = new THREE.CanvasTexture(c); return t;
+})();
 // P9: motorway signs that name places the road never takes you to
 const ROAD_SIGNS = ['HARBOUR 14  ↑', 'AIRPORT  ↗', 'OLD TOWN  ←', 'CITY CENTRE  ↑', 'NORTH RING  →', 'EXIT TO ELSEWHERE'];
 function roadSignTexture(text) {
@@ -533,18 +550,78 @@ function genCell(i, j) {
   const neon = () => 'neon' + Math.floor(rnd() * NEON.length);
   const same = () => 0;                                                        // fixed window offset: identical facades
   const facades = [], roofs = [];
-  const tower = (key, w, h, d, x, z, base, uv = rnd) => {
-    const blank = Math.min(14, h * 0.12);                                      // P5: a windowless base, nothing to look at from the road
-    addBox(bk, 'concrete', 'concrete', w, blank, d, x, base + blank / 2, z);
-    addBox(bk, key, 'roof', w, h - blank, d, x, base + blank + (h - blank) / 2, z, uv);
-    facades.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, y0: base, y1: base + h });
+  // An open ground floor on columns: drive in between them, past parked cars nobody is coming back to (P4)
+  const pilotis = (w, d, x, z, base) => {
+    const H = 7.5, nx = Math.max(2, Math.round(w / 9)), nz = Math.max(2, Math.round(d / 9));
+    for (let a = 0; a < nx; a++) for (let b = 0; b < nz; b++) {
+      const cx = x - w / 2 + 1.5 + (w - 3) * a / (nx - 1), cz = z - d / 2 + 1.5 + (d - 3) * b / (nz - 1);
+      addBox(bk, 'concrete', 'concrete', 0.9, H, 0.9, cx, base + H / 2, cz);
+      solids.push({ x0: cx - 0.45, x1: cx + 0.45, z0: cz - 0.45, z1: cz + 0.45, y0: 0, y1: base + H });
+    }
+    for (let q = -d / 2 + 4; q < d / 2 - 2; q += 7) { addBox(bk, 'fluo', 'fluo', w - 4, 0.05, 0.25, x, base + H - 0.05, z + q); addFlat(bk, 'glowf', x, z + q, Math.min(w, 14), base + 0.05); }
+    const rowZ = z + d / 2 - 5.5;
+    for (let q = -w / 2 + 4; q < w / 2 - 3; q += 3.2) if (rnd() < 0.55) {
+      addBox(bk, 'roof', 'roof', 1.9, 0.75, 4.4, x + q, base + 0.55, rowZ); addBox(bk, 'dark', 'dark', 1.6, 0.5, 2.2, x + q, base + 1.15, rowZ + 0.3);
+      solids.push({ x0: x + q - 0.95, x1: x + q + 0.95, z0: rowZ - 2.2, z1: rowZ + 2.2, y0: 0, y1: 1.4 });
+    }
+    return H;
+  };
+  const tower = (key, w, h, d, x, z, base, uv = rnd, piloti = false) => {
+    const H = piloti ? pilotis(w, d, x, z, base) : 0;
+    const blank = H ? 0 : Math.min(14, h * 0.12);                              // P5: a windowless base, nothing to look at from the road
+    if (blank) addBox(bk, 'concrete', 'concrete', w, blank, d, x, base + blank / 2, z);
+    addBox(bk, key, 'roof', w, h - blank - H, d, x, base + H + blank + (h - blank - H) / 2, z, uv);
+    facades.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, y0: base + H, y1: base + h });
     roofs.push({ x, z, w, d, y: base + h });
   };
+  // P4: a lit ramp down to an underground car park, on the apron by the road. You can look; you can't go down.
+  const ramp = () => {
+    const x0 = LOT_A + 0.8, zc = LOT_A + 18 + rnd() * 26, zl = 13;
+    addBox(bk, 'dark', 'dark', 5.2, 0.04, zl, x0 + 2.8, 0.03, zc);
+    for (const x of [x0 + 0.15, x0 + 5.45]) addBox(bk, 'concrete', 'concrete', 0.3, 1.1, zl, x, 0.55, zc);
+    addBox(bk, 'concrete', 'concrete', 5.6, 1.1, 0.3, x0 + 2.8, 0.55, zc + zl / 2);
+    addBox(bk, 'fluo', 'fluo', 4.6, 0.05, 0.4, x0 + 2.8, 0.06, zc + zl / 2 - 1.2);   // light coming up from below
+    addFlat(bk, 'glowf', x0 + 2.8, zc + zl / 2 - 2.5, 7, 0.07);
+    addBox(bk, 'pole', 'pole', 4.8, 0.08, 0.08, x0 + 2.8, 1.0, zc - zl / 2 + 0.3);    // the barrier arm, down
+    addBox(bk, 'pole', 'pole', 0.12, 3, 0.12, x0 + 5.9, 1.5, zc - zl / 2 - 0.6); addBox(bk, 'shelter', 'shelter', 0.08, 0.9, 0.9, x0 + 5.9, 3.2, zc - zl / 2 - 0.6);
+    solids.push({ x0: x0, x1: x0 + 5.6, z0: zc - zl / 2, z1: zc + zl / 2, y0: 0, y1: 1.1 });
+  };
+  const isGas = i === GAS.i && j === GAS.j;
   let ph = 1, signChance = 0, lampOn = 0.7;
   const FLAT = 0.06;                                                           // a flush plinth: just paving, you can drive across it
   const plinth = h => { ph = h; addBox(bk, 'concrete', 'roof', L, ph, L, mid, ph / 2, mid, rnd); solids.push({ x0: A, x1: B, z0: A, z1: B, y0: 0, y1: ph }); };
 
-  if (zone === 'corridor') {
+  if (isGas) {
+    plinth(FLAT);
+    // canopy over the pumps, by the road; a white underside full of light
+    const cx = A + 9, cz = mid;
+    addBox(bk, 'gasWhite', 'gasWhite', 16, 1.0, 26, cx, 5.6, cz);
+    addBox(bk, 'gasRed', 'gasRed', 16.1, 0.35, 26.1, cx, 5.55, cz);
+    addBox(bk, 'fluo', 'fluo', 14, 0.05, 24, cx, 5.08, cz);
+    addFlat(bk, 'glowg', cx, cz, 34, 0.06);
+    solids.push({ x0: cx - 8, x1: cx + 8, z0: cz - 13, z1: cz + 13, y0: 5.05, y1: 6.1 });
+    for (const x of [cx - 6, cx + 6]) for (const z of [cz - 10, cz + 10]) { addBox(bk, 'gasWhite', 'gasWhite', 0.6, 5.1, 0.6, x, 2.55, z); solids.push({ x0: x - 0.3, x1: x + 0.3, z0: z - 0.3, z1: z + 0.3, y0: 0, y1: 5.1 }); }
+    // two islands, two red pumps each with a lit globe
+    for (const z of [cz - 5, cz + 5]) {
+      addBox(bk, 'concrete', 'concrete', 1.4, 0.25, 5, cx, 0.125, z);
+      solids.push({ x0: cx - 0.7, x1: cx + 0.7, z0: z - 2.5, z1: z + 2.5, y0: 0, y1: 2 });
+      for (const dz of [-1.4, 1.4]) { addBox(bk, 'gasRed', 'gasRed', 0.7, 1.8, 0.55, cx, 1.15, z + dz); addBox(bk, 'warmwin', 'warmwin', 0.36, 0.36, 0.36, cx, 2.25, z + dz); }
+    }
+    // the shop at the back: warm window, one attendant inside, nobody else
+    const sx = B - 7;
+    addBox(bk, 'gasWhite', 'roof', 9, 4.2, 14, sx, 2.1, cz);
+    addBox(bk, 'gasRed', 'gasRed', 9.1, 0.4, 14.1, sx, 4.0, cz);
+    addBox(bk, 'warmwin', 'warmwin', 0.05, 2.2, 11, sx - 4.53, 1.7, cz);
+    solids.push({ x0: sx - 4.5, x1: sx + 4.5, z0: cz - 7, z1: cz + 7, y0: 0, y1: 4.4 });
+    const fm = new THREE.MeshBasicMaterial({ map: figureTex, color: 0x000000, alphaTest: 0.5 }), fg = new THREE.PlaneGeometry(0.9, 1.9);
+    const fig = new THREE.Mesh(fg, fm); fig.position.set(sx - 4.6, 1.55, cz + 2.5); fig.rotation.y = -Math.PI / 2; grp.add(fig); extras.push(fm, fg);
+    // the price sign by the road
+    addBox(bk, 'pole', 'pole', 0.3, 7, 0.3, LOT_A + 1.5, 3.5, A + 2);
+    const gm = new THREE.MeshBasicMaterial({ map: gasSignTex, color: 0xb8b4aa }), gg = new THREE.BoxGeometry(0.3, 4, 3.2);
+    const sign = new THREE.Mesh(gg, gm); sign.position.set(LOT_A + 1.5, 8.4, A + 2); grp.add(sign); extras.push(gm, gg);
+    solids.push({ x0: LOT_A + 1.3, x1: LOT_A + 1.7, z0: A + 1.8, z1: A + 2.2, y0: 0, y1: 10.4 });
+    lampOn = 0.9;
+  } else if (zone === 'corridor') {
     // P5 + P11: the same twin slabs block after block, one lit sky bridge between them that nobody crosses
     plinth(3);
     const alongX = zr() < 0.5, key = zr() < 0.5 ? 'win0' : 'win1', h = 160 + zr() * 60, b1 = 3 + h * (0.22 + zr() * 0.1), b2 = b1 + 30 + zr() * 20;
@@ -559,10 +636,10 @@ function genCell(i, j) {
     // P1 + P2: an open forecourt; the tower stands far back from every road, so the street reads far wider
     plinth(FLAT);
     if ((li + lj) % 2 === 0) { // P1: fewer, bigger masses
-      const tw = 30 + rnd() * 8, td = 30 + rnd() * 8;
-      tower(win(), tw, 260 + rnd() * 120, td, mid, mid, ph);
+      const tw = 30 + rnd() * 8, td = 30 + rnd() * 8, onCols = rnd() < 0.35;
+      tower(win(), tw, 260 + rnd() * 120, td, mid, mid, ph, rnd, onCols);
       // P10: a knee-high spiked ledge hugging the tower's two road sides, and benches with armrests beside it
-      for (const alongX of [true, false]) {
+      if (!onCols) for (const alongX of [true, false]) {
         const lx = alongX ? mid : mid - tw / 2 - 1.2, lz = alongX ? mid - td / 2 - 1.2 : mid, len = (alongX ? tw : td) + 2.4;
         addBox(bk, 'concrete', 'concrete', alongX ? len : 0.8, 0.6, alongX ? 0.8 : len, lx, ph + 0.3, lz);
         solids.push(alongX ? { x0: lx - len / 2, x1: lx + len / 2, z0: lz - 0.4, z1: lz + 0.4, y0: 0, y1: 0.9 } : { x0: lx - 0.4, x1: lx + 0.4, z0: lz - len / 2, z1: lz + len / 2, y0: 0, y1: 0.9 });
@@ -583,6 +660,7 @@ function genCell(i, j) {
       signMats.push(am); extras.push(ag);
       if (rnd() < 0.4) flick.push({ m: am, seed: rnd() * 100, mode: rnd() < 0.5 ? 'dead' : 'flick' });
     }
+    if (rnd() < 0.22) ramp();
     lampOn = 0.85;
   } else if (zone === 'plaza') {
     // P2: the square is empty ground; one monument in the middle block, one lamp beside it
@@ -639,12 +717,14 @@ function genCell(i, j) {
     signChance = 0; lampOn = 0.6;
   } else if (zone === 'residential') {
     // P3 (first pass): a wall of housing slabs, most of their windows dark
-    plinth(2.5);
+    const onCols = rnd() < 0.3;
+    plinth(onCols ? FLAT : 2.5);
     const alongX = rnd() < 0.5, n = 3, sw = 12, gap = (L - 2 - n * sw) / (n - 1), hb = 130 + rnd() * 50;
     for (let k = 0; k < n; k++) {
       const a = A + 1 + sw / 2 + k * (sw + gap), key = rnd() < 0.55 ? 'win4' : 'win0';
-      tower(key, alongX ? sw : L - 6, hb + rnd() * 12, alongX ? L - 6 : sw, alongX ? a : mid, alongX ? mid : a, ph); // P1 + P5
+      tower(key, alongX ? sw : L - 6, hb + rnd() * 12, alongX ? L - 6 : sw, alongX ? a : mid, alongX ? mid : a, ph, rnd, onCols); // P1 + P5
     }
+    if (rnd() < 0.22) ramp();
     if (rnd() < 0.5) { // P10: a locked gate across the gap between two slabs; behind it, a lit courtyard you can't enter
       const g0 = A + 1 + sw, g1 = g0 + gap, gm = (g0 + g1) / 2;
       const gx = (along, h, across, a, yy, b2, key) => alongX ? addBox(bk, key, key, along, h, across, a, yy, b2) : addBox(bk, key, key, across, h, along, b2, yy, a);
@@ -662,8 +742,9 @@ function genCell(i, j) {
     lampOn = 0.35;
   } else {
     // corner: the ordinary mixed city, the only place with street-level neon
-    const vacant = rnd() < 0.14;
-    plinth(vacant ? FLAT : 1.6 + rnd() * 3.5);
+    const vacant = rnd() < 0.14, onCols = !vacant && rnd() < 0.35;
+    plinth(vacant || onCols ? FLAT : 1.6 + rnd() * 3.5);
+    if (!vacant && rnd() < 0.22) ramp();
     if (rnd() < 0.25) { const k = neon(); addBox(bk, k, k, L + 0.1, 0.18, 0.18, mid, ph - 0.35, A - 0.02); }
     if (rnd() < 0.15) { const k = neon(); addBox(bk, k, k, 0.18, 0.18, L + 0.1, A - 0.02, ph - 0.35, mid); }
     const t = rnd();
@@ -676,8 +757,9 @@ function genCell(i, j) {
     } else if (t < 0.5) { // monolith tower with a cantilevered crown
       const w = Math.min(24 + rnd() * 30, L - 2), d = Math.min(20 + rnd() * 32, L - 2), h = 35 + Math.pow(rnd(), 1.6) * 150;
       const cx = A + 1 + w / 2 + rnd() * Math.max(0, L - 2 - w), cz = A + 1 + d / 2 + rnd() * Math.max(0, L - 2 - d);
-      addBox(bk, win(), 'roof', w, h, d, cx, ph + h / 2, cz, rnd);
-      facades.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, y0: ph, y1: ph + h });
+      const H = onCols && t < 0.5 ? pilotis(w, d, cx, cz, ph) : 0;
+      addBox(bk, win(), 'roof', w, h - H, d, cx, ph + H + (h - H) / 2, cz, rnd);
+      facades.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, y0: ph + H, y1: ph + h });
       let topY = ph + h, rw = w, rd = d, rx = cx, rz = cz;
       if (rnd() < 0.6) {
         const w2 = Math.min(w + 6 + rnd() * 8, L + 4), d2 = Math.min(d + 4 + rnd() * 6, L + 4), h2 = 8 + rnd() * 14;
@@ -757,6 +839,40 @@ function genCell(i, j) {
     if (side === 0) pos.x = r.x - r.w / 2 + 1; else if (side === 1) pos.x = r.x + r.w / 2 - 1; else if (side === 2) pos.z = r.z - r.d / 2 + 1; else pos.z = r.z + r.d / 2 - 1;
     place(hSignTex[Math.floor(rnd() * hSignTex.length)], bw, bw / 4, pos, side);
     addBox(bk, 'pole', 'pole', 0.4, 5.5, 0.4, pos.x, r.y + 2.75, pos.z);
+  }
+
+  // P9: the low metro line runs right over this block's x-road on columns down the median
+  if (metroOnX(j)) {
+    const y = 9.5, zc = R / 2;
+    addBox(bk, 'concrete', 'roof', C, 1.2, 9, C / 2, y, zc);
+    for (const s2 of [-1, 1]) { addBox(bk, 'concrete', 'concrete', C, 0.9, 0.25, C / 2, y + 1.05, zc + s2 * 4.4); addBox(bk, 'pole', 'pole', C, 0.12, 0.12, C / 2, y + 0.66, zc + s2 * 0.75); }
+    solids.push({ x0: 0, x1: C, z0: zc - 4.5, z1: zc + 4.5, y0: y - 0.6, y1: y + 1.5 });
+    for (const x of [R + 10, R + 35, R + 60]) { addBox(bk, 'concrete', 'concrete', 1.4, y - 0.6, 1.4, x, (y - 0.6) / 2, zc); solids.push({ x0: x - 0.7, x1: x + 0.7, z0: zc - 0.7, z1: zc + 0.7, y0: 0, y1: y - 0.6 }); }
+  }
+  // ... and the high line over the z-road of some columns, on tall thin legs
+  if (metroOnZ(i)) {
+    const y = 40, xc = R / 2;
+    addBox(bk, 'concrete', 'roof', 9, 1.4, C, xc, y, C / 2);
+    for (const s2 of [-1, 1]) { addBox(bk, 'concrete', 'concrete', 0.25, 0.9, C, xc + s2 * 4.4, y + 1.15, C / 2); addBox(bk, 'pole', 'pole', 0.12, 0.12, C, xc + s2 * 0.75, y + 0.76, C / 2); }
+    solids.push({ x0: xc - 4.5, x1: xc + 4.5, z0: 0, z1: C, y0: y - 0.7, y1: y + 1.6 });
+    for (const z of [R + 10, R + 35, R + 60]) { addBox(bk, 'concrete', 'concrete', 1.6, y - 0.7, 1.6, xc, (y - 0.7) / 2, z); solids.push({ x0: xc - 0.8, x1: xc + 0.8, z0: z - 0.8, z1: z + 0.8, y0: 0, y1: y - 0.7 }); }
+  }
+  // An underpass: a building straddles the z-road for most of the block; you drive through under strip lights
+  if (!isGas && !metroOnZ(i) && (zone === 'corridor' || zone === 'residential' || zone === 'corner') && rnd() < 0.12) {
+    const z0 = R + 6, z1 = C - 6, zl = z1 - z0, zm = (z0 + z1) / 2, bh = 12 + rnd() * 20, x0 = -SW - 1, x1 = R + SW + 1, xw = x1 - x0, xm = (x0 + x1) / 2;
+    addBox(bk, win(), 'roof', xw, bh, zl, xm, 9 + bh / 2, zm, rnd);
+    solids.push({ x0, x1, z0, z1, y0: 9, y1: 9 + bh });
+    for (let z = z0 + 2; z <= z1 - 2; z += 10) for (const x of [-SW / 2 - 0.5, R + SW / 2 + 0.5]) { addBox(bk, 'concrete', 'concrete', 0.8, 9, 0.8, x, 4.5, z); solids.push({ x0: x - 0.4, x1: x + 0.4, z0: z - 0.4, z1: z + 0.4, y0: 0, y1: 9 }); }
+    for (const x of [R * 0.25, R * 0.5, R * 0.75]) addBox(bk, 'fluo', 'fluo', 0.25, 0.05, zl - 4, x, 8.95, zm);
+    for (let z = z0 + 6; z < z1 - 4; z += 12) addFlat(bk, 'glowf', R / 2, z, 14, 0.06);
+  }
+  // A footbridge over the x-road: lit, glazed, empty (P11)
+  if (!isGas && !metroOnX(j) && (zone === 'residential' || zone === 'corridor') && rnd() < 0.15) {
+    const xb = R + 20 + rnd() * 3, y = 6.8, z0 = -SW - 2, z1 = R + SW + 2, zl = z1 - z0, zm = (z0 + z1) / 2;
+    addBox(bk, 'concrete', 'roof', 3.4, 0.4, zl, xb, y, zm);
+    addBox(bk, 'bridge', 'roof', 3, 2.6, zl, xb, y + 1.5, zm);
+    for (const z of [z0 - 1.7, z1 + 1.7]) { addBox(bk, 'concrete', 'roof', 3.4, y + 2.8, 3.4, xb, (y + 2.8) / 2, z); solids.push({ x0: xb - 1.7, x1: xb + 1.7, z0: z - 1.7, z1: z + 1.7, y0: 0, y1: y + 2.8 }); }
+    solids.push({ x0: xb - 1.7, x1: xb + 1.7, z0, z1, y0: y - 0.2, y1: y + 2.8 });
   }
 
   // street lamps with sodium light pools on the road; how many still work depends on the zone
@@ -990,7 +1106,7 @@ function placeMoment(ci, cj) {
   const v = car.vel; if (v.lengthSq() < 9) return;
   const alongZ = Math.abs(v.z) > Math.abs(v.x), s = Math.sign(alongZ ? v.z : v.x);
   const ti = alongZ ? ci : ci + s * VIEW, tj = alongZ ? cj + s * VIEW : cj, key = ti + ',' + tj;
-  if (cells.has(key) || moments.cache.has(key)) return;
+  if (cells.has(key) || moments.cache.has(key) || (ti === GAS.i && tj === GAS.j)) return;
   const zone = zoneFor(districtOf(ti), districtOf(tj)), li = ti - districtOf(ti) * DS, lj = tj - districtOf(tj) * DS;
   let type = MOMENT_FOR[zone];
   if (type === 'window' && (li + lj) % 2) type = 'taillights';            // no tower on this block of the boulevard
@@ -1611,6 +1727,16 @@ const radio = {
     og.gain.setValueAtTime(0.04, t + 0.92); og.gain.exponentialRampToValueAtTime(0.0001, t + 1.02);
     o.connect(og); og.connect(this.comp); o.start(t + 0.9); o.stop(t + 1.05);
   },
+  trainPass(v, pan) { // a train going over: a long low rumble with the rail joints in it
+    if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, s2 = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), dur = 6;
+    const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    s2.buffer = this.brown; s2.loop = true; f.type = 'lowpass'; f.frequency.value = 380;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.12 * v, t + 1.8); g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    s2.connect(f); f.connect(g); if (p) { p.pan.value = pan; g.connect(p); p.connect(this.comp); p.connect(this.rev); } else g.connect(this.comp);
+    s2.start(t, Math.random() * 3); s2.stop(t + dur);
+    for (let k = 0; k < 10; k++) { const tk = t + 0.6 + k * 0.42, o = ctx.createOscillator(), og = ctx.createGain(); o.frequency.value = 70;
+      og.gain.setValueAtTime(0.03 * v, tk); og.gain.exponentialRampToValueAtTime(0.0001, tk + 0.08); o.connect(og); og.connect(p || this.comp); o.start(tk); o.stop(tk + 0.1); }
+  },
   boostSound(b) {
     if (!this.full) return; const t = this.ctx.currentTime;
     this.boostG.gain.setTargetAtTime(b * 0.22, t, 0.08); this.boostF.frequency.setTargetAtTime(400 + b * 1600, t, 0.2);
@@ -1750,7 +1876,7 @@ function setDay(d) {
   moonLight.color.setHex(L.sun); moonLight.position.set(...L.sunPos);
   skyGroup.visible = !d;                                            // no moon or stars by day
   mats.lamp.color.setHex(L.lamp); mats.lampv.color.setHex(L.lampv);
-  for (const k of ['glow', 'glowv', 'glowc', 'glowd']) mats[k].visible = !d;   // no light pools on the road in daylight
+  for (const k of ['glow', 'glowv', 'glowc', 'glowd', 'glowf', 'glowg']) mats[k].visible = !d;   // no light pools on the road in daylight
   if (bloom) bloom.threshold = L.bloomT;
   ground.material.color.setHex(d ? 0x8c8c8c : 0xffffff);          // tame the asphalt speckle in full daylight
   for (const obj of [carMesh, shipMesh]) obj.traverse(m => {     // the warm dash glow is for the night; by day the glass is just glass
@@ -2035,6 +2161,49 @@ function updateHud(elapsed) {
   $('clock').textContent = String(Math.floor(mins / 60)).padStart(2, '0') + ':' + String(mins % 60).padStart(2, '0');
 }
 
+/* ---------- metro trains ---------- */
+const metro = { trains: [], next: 4 };
+const trainBody = new THREE.MeshStandardMaterial({ color: 0x3a3c41, roughness: 0.5, metalness: 0.35 });
+function metroTick(dt) {
+  metro.next -= dt;
+  const ci = Math.floor(car.pos.x / C), cj = Math.floor(car.pos.z / C);
+  if (metro.next <= 0 && metro.trains.length < 3) {
+    metro.next = 7 + Math.random() * 9;
+    const lines = [];
+    for (let j = cj - 4; j <= cj + 4; j++) if (metroOnX(j)) lines.push({ alongX: true, cross: j * C + R / 2, y: 9.5 + 0.6 });
+    for (let i = ci - 4; i <= ci + 4; i++) if (metroOnZ(i)) lines.push({ alongX: false, cross: i * C + R / 2, y: 40 + 0.7 });
+    if (lines.length) spawnTrain(lines[Math.floor(Math.random() * lines.length)]);
+  }
+  for (let k = metro.trains.length - 1; k >= 0; k--) {
+    const t = metro.trains[k], carAlong = t.alongX ? car.pos.x : car.pos.z, carCross = t.alongX ? car.pos.z : car.pos.x;
+    t.along += t.dir * t.speed * dt;
+    if (t.alongX) t.g.position.x = t.along; else t.g.position.z = t.along;
+    const d = Math.hypot(t.along - carAlong, t.cross - carCross);
+    if (!t.heard && d < 140) { t.heard = true; radio.trainPass(Math.max(0.25, 1 - d / 140), panFor(t.alongX ? t.along : t.cross, t.alongX ? t.cross : t.along)); }
+    if ((t.along - carAlong) * t.dir > 700 || Math.abs(t.cross - carCross) > 900) { scene.remove(t.g); t.geos.forEach(x => x.dispose()); metro.trains.splice(k, 1); }
+  }
+}
+function spawnTrain(line) {
+  const g = new THREE.Group(), geos = [], cars = 6, cl = 18, dir = Math.random() < 0.5 ? 1 : -1;
+  const box = (len, h, w) => line.alongX ? new THREE.BoxGeometry(len, h, w) : new THREE.BoxGeometry(w, h, len);
+  for (let k = 0; k < cars; k++) {
+    const bg = box(cl, 3.4, 3), wg = box(cl - 1.6, 1.6, 3.06); geos.push(bg, wg);
+    const a = -dir * k * (cl + 0.8), b = new THREE.Mesh(bg, trainBody), w = new THREE.Mesh(wg, mats.warmwin);
+    if (line.alongX) { b.position.set(a, line.y + 1.7, 0); w.position.set(a, line.y + 2.0, 0); } else { b.position.set(0, line.y + 1.7, a); w.position.set(0, line.y + 2.0, a); }
+    g.add(b, w);
+  }
+  if (line.y < 20) { // the low line throws its light onto the street below as it passes
+    const lg = line.alongX ? new THREE.PlaneGeometry(cars * (cl + 0.8), 16) : new THREE.PlaneGeometry(16, cars * (cl + 0.8)); geos.push(lg);
+    const glow = new THREE.Mesh(lg, glowMat(0xffc98a, 0.32)); glow.rotation.x = -Math.PI / 2; glow.renderOrder = 1;
+    const mid = -dir * (cars - 1) * (cl + 0.8) / 2; if (line.alongX) glow.position.set(mid, 0.08, 0); else glow.position.set(0, 0.08, mid);
+    g.add(glow); geos.push({ dispose: () => glow.material.dispose() });
+  }
+  const carAlong = line.alongX ? car.pos.x : car.pos.z, along = carAlong - dir * (380 + Math.random() * 120);
+  if (line.alongX) g.position.set(along, 0, line.cross); else g.position.set(line.cross, 0, along);
+  scene.add(g);
+  metro.trains.push({ g, geos, alongX: line.alongX, cross: line.cross, along, dir, speed: 21 + Math.random() * 6, heard: false });
+}
+
 /* ---------- map ---------- */
 // Blocks tinted by zone, your route as a faint sodium line. Moments are never shown: they stay surprises.
 const ZONE_TINT = { corridor: '#33363d', boulevard: '#3c3933', plaza: '#24272b', interchange: '#383742', residential: '#3a3632', corner: '#4b3d2b', fog: '#20242b' };
@@ -2059,6 +2228,10 @@ function drawMap(ctx, w, h, cx, cz, scale, rot) {
     ctx.fillStyle = zone ? ZONE_TINT[zone] : '#15171b';
     ctx.fillRect(i * C + A - 2, j * C + A - 2, B - A + 4, B - A + 4);
   }
+  ctx.strokeStyle = 'rgba(120,132,150,0.55)'; ctx.lineWidth = 3 / scale * (w / 300);    // metro lines
+  for (let j = j0; j <= j1; j++) if (metroOnX(j)) { ctx.beginPath(); ctx.moveTo(i0 * C, j * C + R / 2); ctx.lineTo((i1 + 1) * C, j * C + R / 2); ctx.stroke(); }
+  for (let i = i0; i <= i1; i++) if (metroOnZ(i)) { ctx.beginPath(); ctx.moveTo(i * C + R / 2, j0 * C); ctx.lineTo(i * C + R / 2, (j1 + 1) * C); ctx.stroke(); }
+  ctx.fillStyle = '#d98a3a'; const gs = 14 / scale * (w / 300); ctx.fillRect(GAS.i * C + 65 - gs / 2, GAS.j * C + 65 - gs / 2, gs, gs);   // the gas station
   if (route.length > 1) {
     ctx.strokeStyle = 'rgba(255,138,58,0.6)'; ctx.lineWidth = 2.2 / scale * (w / 300); ctx.lineJoin = ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(route[0][0], route[0][1]);
@@ -2093,6 +2266,7 @@ function drawBigMap() {   // north up, the whole route tonight, and the names of
     ctx.fillStyle = 'rgba(9,11,14,.7)'; const tw = ctx.measureText(d.name).width; ctx.fillRect(sx - tw / 2 - 6, sy - w * 0.014, tw + 12, w * 0.028);
     ctx.fillStyle = 'rgba(236,230,220,.82)'; ctx.fillText(d.name, sx, sy);
   }
+  { const gx = (GAS.i * C + 65 - cx) * scale + w / 2, gy = (GAS.j * C + 65 - cz) * scale + h / 2; if (gx > 0 && gy > 0 && gx < w && gy < h) { ctx.fillStyle = 'rgba(217,138,58,.95)'; ctx.fillText('GAS', gx, gy - w * 0.025); } }
   carMarker(ctx, (car.pos.x - cx) * scale + w / 2, (car.pos.z - cz) * scale + h / 2, -car.heading, w * 0.018);
   ctx.fillStyle = 'rgba(236,230,220,.6)'; ctx.font = `600 ${Math.round(w * 0.024)}px "IBM Plex Mono",monospace`; ctx.fillText('N', w / 2, w * 0.03);
 }
@@ -2106,6 +2280,7 @@ function frame() {
   if (paused) return;                                   // nothing moves; the last frame stays on screen
   const dt = dt0; elapsed += dt;
   if (started) { drive(dt); directorTick(dt); momentsTick(dt, elapsed); }
+  metroTick(dt);
   NIGHT.value = dayMode ? 0 : director.litFraction;          // by day no window is lit
   updateCells(); pumpCells(started ? 2 : 4);
 
