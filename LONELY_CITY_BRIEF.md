@@ -1,7 +1,7 @@
 # Lonely City — Design Brief for Concrete Nocturne
 
 Hand this file to a session along with `concrete-nocturne.html`.
-Research lives in `/Users/alisyed/Documents/YouTube/Research/Lonely_City/`.
+Research lives in `Research/Lonely_City/` (kept locally, not in the repo).
 
 ---
 
