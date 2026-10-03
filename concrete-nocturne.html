@@ -57,6 +57,10 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
 
 [hidden]{display:none!important} /* the standalone play.html has no host reset, so say it here */
 
+/* caption: one quiet line, centred low, then gone */
+.caption{position:fixed;left:0;right:0;bottom:22%;text-align:center;pointer-events:none;font-family:var(--display);font-size:13px;letter-spacing:.42em;text-transform:uppercase;color:var(--ink);text-shadow:0 0 18px rgba(0,0,0,.9);opacity:0;transition:opacity 1.6s}
+.caption.on{opacity:.82}
+
 /* minimap */
 .minimap{width:150px;height:150px;display:block;border:1px solid var(--faint);background:var(--glass);border-radius:2px;margin-top:4px;align-self:flex-end}
 @media (max-width:560px){.minimap{width:108px;height:108px}}
@@ -148,6 +152,8 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
     <button class="tb gas" data-k="up" type="button">Gas</button>
   </div>
 </div>
+
+<div class="caption" id="caption" aria-live="polite"></div>
 
 <div class="pause" id="pause" hidden>
   <div class="pause-text">
@@ -2161,6 +2167,99 @@ function updateHud(elapsed) {
   $('clock').textContent = String(Math.floor(mins / 60)).padStart(2, '0') + ':' + String(mins % 60).padStart(2, '0');
 }
 
+/* ---------- the chase ---------- */
+// Now and then a lone car's tail lights appear ahead and it drives off through the city, turning at junctions.
+// It waits if you fall back and runs if you close in. Stay on it and it pulls over: lights out, nobody inside.
+const quarry = { q: null, next: 35 };
+const quarryPaint = new THREE.MeshStandardMaterial({ color: 0x2b3833, metalness: 0.3, roughness: 0.45, emissive: 0x050706, emissiveIntensity: 0.5 });
+const quarryGlass = new THREE.MeshStandardMaterial({ color: 0x07080a, metalness: 0.5, roughness: 0.08 });
+function buildQuarryMesh() {
+  const g = new THREE.Group(), geos = [], red = new THREE.MeshBasicMaterial({ color: 0xff2a1e }), white = new THREE.MeshBasicMaterial({ color: 0xfff1d6 });
+  const body = profileGeo([[-2.22, 0.3], [2.2, 0.3], [2.24, 0.52], [2.2, 0.8], [0.95, 0.88], [-1.55, 0.9], [-2.18, 0.86], [-2.24, 0.55]], 1.86, 0.04);
+  const glass = profileGeo([[0.92, 0.88], [0.4, 1.36], [-1.05, 1.38], [-1.52, 0.9]], 1.66, 0.03);
+  const tl = new THREE.BoxGeometry(0.46, 0.17, 0.04), hl = new THREE.CircleGeometry(0.1, 16), wg = new THREE.CylinderGeometry(0.33, 0.33, 0.2, 14); wg.rotateZ(Math.PI / 2);
+  geos.push(body, glass, tl, hl, wg);
+  g.add(new THREE.Mesh(body, quarryPaint), new THREE.Mesh(glass, quarryGlass));
+  for (const x of [-0.66, 0.66]) { const m = new THREE.Mesh(tl, red); m.position.set(x, 0.62, 2.245); g.add(m); }
+  for (const x of [-0.78, -0.55, 0.55, 0.78]) { const m = new THREE.Mesh(hl, white); m.position.set(x, 0.64, -2.255); m.rotation.y = Math.PI; g.add(m); }
+  for (const [x, z] of [[0.8, -1.25], [-0.8, -1.25], [0.8, 1.3], [-0.8, 1.3]]) { const m = new THREE.Mesh(wg, mats.dark); m.position.set(x, 0.33, z); g.add(m); }
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(3, 2.5), glowMat(0xff3020, 0.45)); geos.push(glow.geometry);
+  glow.rotation.x = -Math.PI / 2; glow.position.set(0, 0.06, 3.2); g.add(glow);
+  return { g, geos, red, white, glowMat: glow.material };
+}
+const roadCenter = k => k * C + R / 2;
+function spawnQuarry() {
+  const v = car.vel, moving = v.lengthSq() > 4;
+  const alongX = moving ? Math.abs(v.x) > Math.abs(v.z) : Math.abs(Math.sin(car.heading)) > 0.7;
+  const dir = Math.sign(alongX ? (moving ? v.x : -Math.sin(car.heading)) : (moving ? v.z : -Math.cos(car.heading))) || -1;
+  const lateral = alongX ? car.pos.z : car.pos.x, k = Math.round((lateral - R / 2) / C);
+  const mesh = buildQuarryMesh(); scene.add(mesh.g);
+  const q = { mesh, alongX, dir, k, along: (alongX ? car.pos.x : car.pos.z) + dir * 160, speed: Math.max(14, Math.abs(car.speed)), lane: 7, laneT: 7,
+    plan: null, planAt: null, close: 0, state: 'run', t: 0, vis: new THREE.Vector3(), heading: 0 };
+  quarryPose(q, true);
+  quarry.q = q;
+}
+// lane offset to the right of travel; the right side of +x travel is +z, of -z travel is +x
+const rightSign = q => q.alongX ? q.dir : -q.dir;
+function quarryPose(q, snap) {
+  const lat = roadCenter(q.k) + rightSign(q) * q.lane;
+  const x = q.alongX ? q.along : lat, z = q.alongX ? lat : q.along;
+  const h = q.alongX ? (q.dir > 0 ? -Math.PI / 2 : Math.PI / 2) : (q.dir > 0 ? Math.PI : 0);
+  if (snap) { q.vis.set(x, 0, z); q.heading = h; }
+  else {
+    const kk = 1 - Math.exp(-8 * (1 / 60)); q.vis.x += (x - q.vis.x) * kk; q.vis.z += (z - q.vis.z) * kk;
+    let dh = h - q.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); q.heading += dh * Math.min(1, kk * 1.2);
+  }
+  q.mesh.g.position.copy(q.vis); q.mesh.g.rotation.y = q.heading;
+}
+function quarryTick(dt) {
+  if (!quarry.q) { quarry.next -= dt; if (quarry.next <= 0) spawnQuarry(); return; }
+  const q = quarry.q; q.t += dt;
+  const d = Math.hypot(q.vis.x - car.pos.x, q.vis.z - car.pos.z);
+  if (q.state === 'run') {
+    // pace: wait if you fall back, run if you close in
+    let target = d > 220 ? 15 : d < 80 ? Math.min(62, Math.max(28, Math.abs(car.speed) * 1.04)) : 30;
+    const nextX = Math.floor((q.along - R / 2) / C + (q.dir > 0 ? 1 : 0)) * C + R / 2;      // centre of the next junction ahead
+    const toJunction = (nextX - q.along) * q.dir;
+    if (q.planAt !== nextX && toJunction < 60) { q.planAt = nextX; const rr = Math.random(); q.plan = rr < 0.55 ? 0 : rr < 0.775 ? 1 : -1; }   // 0 straight, 1 right, -1 left
+    if (q.plan && toJunction < 45) target = Math.min(target, 17);
+    q.speed += clamp(target - q.speed, -14 * dt, 10 * dt);
+    const step = q.speed * dt;
+    if (q.plan && toJunction >= 0 && toJunction <= step + 0.01) {               // turn at the junction centre
+      const rs = rightSign(q), lat = roadCenter(q.k) + rs * q.lane;
+      const newDir = q.plan === 1 ? rs : -rs;
+      const crossed = roadCenter(q.k);                                         // on the new road, this junction is already behind the plan
+      q.alongX = !q.alongX; q.k = Math.round((nextX - R / 2) / C); q.dir = newDir; q.along = lat; q.plan = 0; q.planAt = crossed;
+    } else q.along += q.dir * step;
+    // stay close for a moment and it gives up
+    if (d < 11) q.close += dt; else q.close = Math.max(0, q.close - dt * 0.5);
+    if (q.close > 1.2) { q.state = 'pull'; q.t = 0; q.laneT = 12.5; }
+    if (d > 650) { q.state = 'gone'; }
+  } else if (q.state === 'pull') {
+    q.speed = Math.max(0, q.speed - 9 * dt); q.along += q.dir * q.speed * dt;
+    q.lane += (q.laneT - q.lane) * Math.min(1, dt * 1.5);
+    if (q.speed === 0 && q.t > 1.5) { q.state = 'off'; q.t = 0; radio.click(panFor(q.vis.x, q.vis.z)); }
+  } else if (q.state === 'off') {
+    const f = Math.max(0, 1 - q.t / 1.6);                                      // lights fade out
+    q.mesh.red.color.setRGB(f, 0.16 * f, 0.12 * f); q.mesh.white.color.setRGB(f, 0.94 * f, 0.84 * f); q.mesh.glowMat.opacity = 0.45 * f;
+    if (q.t > 2.2 && !q.said) { q.said = true; caption('No one inside.'); }
+    if (d > 260) q.state = 'gone';
+  }
+  quarryPose(q, false);
+  // you can't drive through it
+  if (d < 3.4 && q.state !== 'gone') {
+    const nx = (car.pos.x - q.vis.x) / (d || 1), nz = (car.pos.z - q.vis.z) / (d || 1);
+    car.pos.x = q.vis.x + nx * 3.4; car.pos.z = q.vis.z + nz * 3.4;
+    const vn = car.vel.x * nx + car.vel.z * nz; if (vn < 0) { car.vel.x -= nx * vn * 1.2; car.vel.z -= nz * vn * 1.2; car.speed = car.vel.dot(fwd); car.bump = Math.max(car.bump, 0.4); radio.thump(0.4); }
+  }
+  if (q.state === 'gone') {
+    scene.remove(q.mesh.g); q.mesh.geos.forEach(x => x.dispose()); q.mesh.red.dispose(); q.mesh.white.dispose(); q.mesh.glowMat.dispose();
+    quarry.next = q.said ? 120 + Math.random() * 80 : 60 + Math.random() * 30; quarry.q = null;
+  }
+}
+let captionTimer = 0;
+function caption(text) { const el = $('caption'); el.textContent = text; el.classList.add('on'); clearTimeout(captionTimer); captionTimer = setTimeout(() => el.classList.remove('on'), 4200); }
+
 /* ---------- metro trains ---------- */
 const metro = { trains: [], next: 4 };
 const trainBody = new THREE.MeshStandardMaterial({ color: 0x3a3c41, roughness: 0.5, metalness: 0.35 });
@@ -2232,6 +2331,7 @@ function drawMap(ctx, w, h, cx, cz, scale, rot) {
   for (let j = j0; j <= j1; j++) if (metroOnX(j)) { ctx.beginPath(); ctx.moveTo(i0 * C, j * C + R / 2); ctx.lineTo((i1 + 1) * C, j * C + R / 2); ctx.stroke(); }
   for (let i = i0; i <= i1; i++) if (metroOnZ(i)) { ctx.beginPath(); ctx.moveTo(i * C + R / 2, j0 * C); ctx.lineTo(i * C + R / 2, (j1 + 1) * C); ctx.stroke(); }
   ctx.fillStyle = '#d98a3a'; const gs = 14 / scale * (w / 300); ctx.fillRect(GAS.i * C + 65 - gs / 2, GAS.j * C + 65 - gs / 2, gs, gs);   // the gas station
+  if (quarry.q && quarry.q.state === 'run') { ctx.fillStyle = '#ff3a2a'; ctx.beginPath(); ctx.arc(quarry.q.vis.x, quarry.q.vis.z, 9 / scale * (w / 300), 0, 7); ctx.fill(); }
   if (route.length > 1) {
     ctx.strokeStyle = 'rgba(255,138,58,0.6)'; ctx.lineWidth = 2.2 / scale * (w / 300); ctx.lineJoin = ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(route[0][0], route[0][1]);
@@ -2279,7 +2379,7 @@ function frame() {
   const dt0 = Math.min(clock.getDelta(), 0.05);
   if (paused) return;                                   // nothing moves; the last frame stays on screen
   const dt = dt0; elapsed += dt;
-  if (started) { drive(dt); directorTick(dt); momentsTick(dt, elapsed); }
+  if (started) { drive(dt); directorTick(dt); momentsTick(dt, elapsed); quarryTick(dt); }
   metroTick(dt);
   NIGHT.value = dayMode ? 0 : director.litFraction;          // by day no window is lit
   updateCells(); pumpCells(started ? 2 : 4);
