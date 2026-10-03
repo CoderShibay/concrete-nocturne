@@ -202,10 +202,11 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
 'use strict';
 
 /* ---------- world constants ---------- */
-const C = 90;           // city block pitch (m)
-const R = 22;           // road width
+const C = 100;          // city block pitch (m)
+const R = 30;           // road width: about six lanes, room to turn and drift at speed
 const SW = 4;           // sidewalk width
-const A = R + SW, B = C - SW;   // solid lot rect inside each cell
+const A = R + SW, B = C - SW;   // the lot, between the sidewalks
+const LOT_A = A, LOT_B = B, INSET = 7;   // buildings stand INSET metres inside the lot; the apron around them is drivable
 const VIEW = 3;         // cells loaded around the car
 const TEX_W = 24, TEX_H = 51.2; // metres covered by one facade texture tile
 const NEON = [0xff2e97, 0x22e6ff, 0x9d5cff, 0xffb03a, 0x4dffc3];
@@ -526,6 +527,7 @@ function genCell(i, j) {
   const mom = moments.cache.get(i + ',' + j), extras = [], ticks = [];   // this block's moment, if the director gave it one
   let momentPos = null;
   if (mom) mom.generated = true;
+  const A = LOT_A + INSET, B = LOT_B - INSET;                                 // walls pulled back from the road: the apron is open paving
   const L = B - A, mid = (A + B) / 2;
   const win = () => rnd() < 0.35 ? 'win4' : 'win' + Math.floor(rnd() * 4);
   const neon = () => 'neon' + Math.floor(rnd() * NEON.length);
@@ -539,7 +541,8 @@ function genCell(i, j) {
     roofs.push({ x, z, w, d, y: base + h });
   };
   let ph = 1, signChance = 0, lampOn = 0.7;
-  const plinth = h => { ph = h; addBox(bk, 'concrete', 'roof', L, ph, L, mid, ph / 2, mid, rnd); solids.push({ x0: A, x1: B, z0: A, z1: B, y0: 0, y1: ph }); }; // fills the lot; also the collision box
+  const FLAT = 0.06;                                                           // a flush plinth: just paving, you can drive across it
+  const plinth = h => { ph = h; addBox(bk, 'concrete', 'roof', L, ph, L, mid, ph / 2, mid, rnd); solids.push({ x0: A, x1: B, z0: A, z1: B, y0: 0, y1: ph }); };
 
   if (zone === 'corridor') {
     // P5 + P11: the same twin slabs block after block, one lit sky bridge between them that nobody crosses
@@ -554,51 +557,50 @@ function genCell(i, j) {
     lampOn = 0.75;
   } else if (zone === 'boulevard') {
     // P1 + P2: an open forecourt; the tower stands far back from every road, so the street reads far wider
-    plinth(0.4);
-    if ((li + lj) % 2 === 0) tower(win(), 30 + rnd() * 8, 260 + rnd() * 120, 30 + rnd() * 8, mid, mid, ph); // P1: fewer, bigger masses
+    plinth(FLAT);
+    if ((li + lj) % 2 === 0) { // P1: fewer, bigger masses
+      const tw = 30 + rnd() * 8, td = 30 + rnd() * 8;
+      tower(win(), tw, 260 + rnd() * 120, td, mid, mid, ph);
+      // P10: a knee-high spiked ledge hugging the tower's two road sides, and benches with armrests beside it
+      for (const alongX of [true, false]) {
+        const lx = alongX ? mid : mid - tw / 2 - 1.2, lz = alongX ? mid - td / 2 - 1.2 : mid, len = (alongX ? tw : td) + 2.4;
+        addBox(bk, 'concrete', 'concrete', alongX ? len : 0.8, 0.6, alongX ? 0.8 : len, lx, ph + 0.3, lz);
+        solids.push(alongX ? { x0: lx - len / 2, x1: lx + len / 2, z0: lz - 0.4, z1: lz + 0.4, y0: 0, y1: 0.9 } : { x0: lx - 0.4, x1: lx + 0.4, z0: lz - len / 2, z1: lz + len / 2, y0: 0, y1: 0.9 });
+        for (let q = -len / 2 + 0.3; q < len / 2; q += 0.6) addBox(bk, 'pole', 'pole', 0.06, 0.18, 0.06, alongX ? lx + q : lx, ph + 0.69, alongX ? lz : lz + q);
+      }
+      const bxb = mid - tw / 2 - 3.2;
+      for (const q of [mid - 8, mid + 8]) {
+        addBox(bk, 'pole', 'pole', 0.5, 0.1, 2.4, bxb, ph + 0.45, q);
+        for (const dq of [-1.15, 0, 1.15]) addBox(bk, 'pole', 'pole', 0.5, 0.3, 0.07, bxb, ph + 0.62, q + dq);
+        solids.push({ x0: bxb - 0.3, x1: bxb + 0.3, z0: q - 1.3, z1: q + 1.3, y0: 0, y1: 0.8 });
+      }
+    }
     else if (rnd() < 0.7) { // P8: a lit ad on a pylon in the middle of the empty forecourt, selling to nobody
       addBox(bk, 'pole', 'pole', 0.7, 9, 0.7, mid, ph + 4.5, mid);
       const am = new THREE.MeshBasicMaterial({ map: adTex[Math.floor(rnd() * adTex.length)], color: 0x9c9890 });
       const ag = new THREE.BoxGeometry(5, 7.5, 5), ad = new THREE.Mesh(ag, am); ad.position.set(mid, ph + 12.75, mid); grp.add(ad);
-      solids.push({ x0: mid - 2.5, x1: mid + 2.5, z0: mid - 2.5, z1: mid + 2.5, y0: ph + 9, y1: ph + 16.5 });
+      solids.push({ x0: mid - 2.5, x1: mid + 2.5, z0: mid - 2.5, z1: mid + 2.5, y0: ph + 9, y1: ph + 16.5 }, { x0: mid - 0.4, x1: mid + 0.4, z0: mid - 0.4, z1: mid + 0.4, y0: 0, y1: ph + 9 });
       signMats.push(am); extras.push(ag);
       if (rnd() < 0.4) flick.push({ m: am, seed: rnd() * 100, mode: rnd() < 0.5 ? 'dead' : 'flick' });
     }
-    // P10: a knee-high ledge along both road edges with spikes along it, and benches with armrests
-    for (const alongX of [true, false]) {
-      const lx = alongX ? mid : A + 1.4, lz = alongX ? A + 1.4 : mid;
-      addBox(bk, 'concrete', 'concrete', alongX ? L - 2 : 0.8, 0.6, alongX ? 0.8 : L - 2, lx, ph + 0.3, lz);
-      for (let q = A + 1.3; q < B - 1; q += 0.6) addBox(bk, 'pole', 'pole', 0.06, 0.18, 0.06, alongX ? q : lx, ph + 0.69, alongX ? lz : q);
-    }
-    for (const q of [A + 16, B - 16]) {
-      addBox(bk, 'pole', 'pole', 0.5, 0.1, 2.4, A + 4.2, ph + 0.45, q);
-      for (const dq of [-1.15, 0, 1.15]) addBox(bk, 'pole', 'pole', 0.5, 0.3, 0.07, A + 4.2, ph + 0.62, q + dq);
-    }
     lampOn = 0.85;
   } else if (zone === 'plaza') {
-    const fenced = !(li === DS >> 1 && lj === DS >> 1) && rnd() < 0.6;
     // P2: the square is empty ground; one monument in the middle block, one lamp beside it
-    plinth(0.3);
+    plinth(FLAT);
     if (li === DS >> 1 && lj === DS >> 1) {
       addBox(bk, 'concrete', 'roof', 22, 3, 22, mid, ph + 1.5, mid);
+      solids.push({ x0: mid - 11, x1: mid + 11, z0: mid - 11, z1: mid + 11, y0: 0, y1: ph + 3 });
       addBox(bk, 'concrete', 'roof', 12, 150, 12, mid, ph + 3 + 75, mid);   // P1: its top is lost in the haze
       solids.push({ x0: mid - 6, x1: mid + 6, z0: mid - 6, z1: mid + 6, y0: 0, y1: ph + 153 });
       addBox(bk, 'pole', 'pole', 0.3, 9, 0.3, mid + 14, ph + 4.5, mid + 14);
       addBox(bk, 'lamp', 'lamp', 0.7, 0.25, 0.7, mid + 14, ph + 9, mid + 14);
       addFlat(bk, 'glow', mid + 14, mid + 14, 22, ph + 0.03);
     }
-    if (fenced) { // P10: a fence around the empty ground, posts every three metres, no way in
-      const e0 = A + 0.6, e1 = B - 0.6, fl = e1 - e0, fm = (e0 + e1) / 2;
-      for (const [x, z, alongX] of [[fm, e0, true], [fm, e1, true], [e0, fm, false], [e1, fm, false]]) {
-        for (const yy of [1.1, 2.1]) addBox(bk, 'pole', 'pole', alongX ? fl : 0.05, 0.05, alongX ? 0.05 : fl, x, ph + yy, z);
-        for (let q = 0; q <= fl + 0.01; q += 3) addBox(bk, 'pole', 'pole', 0.08, 2.2, 0.08, alongX ? e0 + q : x, ph + 1.1, alongX ? z : e0 + q);
-      }
-    }
     lampOn = 0.15;
   } else if (zone === 'interchange') {
     // P9: elevated roads cross overhead on columns that stand only on the lots. They come out of one concrete
     // portal and go into another; there is no ramp down to you. Green signs name places you'll never reach.
-    plinth(1.2);
+    plinth(FLAT);
     const axisX = zr() < 0.5, second = zr() < 0.55;
     const deck = (alongX, y, lk, sideRnd) => {
       const a0 = lk === 0 ? A : 0, a1 = lk === DS - 1 ? B : C, len = a1 - a0, am = (a0 + a1) / 2;
@@ -610,7 +612,7 @@ function genCell(i, j) {
       if (lk === DS - 1) box3(B - 16, B, mid - 9, mid + 9, 0, y + 5);
       bx(len, 1.1, 0.3, am, y + 1.25, mid - 6.85, 'concrete', 'concrete');                // barriers
       bx(len, 1.1, 0.3, am, y + 1.25, mid + 6.85, 'concrete', 'concrete');
-      for (const ca of [A + 8, B - 8]) if (ca > a0 && ca < a1) bx(3, y - ph, 3, ca, ph + (y - ph) / 2, mid, 'concrete', 'concrete');
+      for (const ca of [A + 8, B - 8]) if (ca > a0 && ca < a1) { bx(3, y - ph, 3, ca, ph + (y - ph) / 2, mid, 'concrete', 'concrete'); box3(ca - 1.5, ca + 1.5, mid - 1.5, mid + 1.5, 0, y); }
       if (lk === 0) bx(16, y + 5 - ph, 18, A + 8, ph + (y + 5 - ph) / 2, mid, 'concrete', 'roof');   // portal it comes out of
       if (lk === DS - 1) bx(16, y + 5 - ph, 18, B - 8, ph + (y + 5 - ph) / 2, mid, 'concrete', 'roof');   // portal it disappears into
       for (const la of [am - len / 4, am + len / 4]) { bx(0.2, 3, 0.2, la, y + 2.2, mid - 6.6, 'pole', 'pole'); bx(0.9, 0.2, 0.4, la, y + 3.7, mid - 6.3, 'lamp', 'lamp'); }
@@ -632,6 +634,7 @@ function genCell(i, j) {
     for (let k = 0; k < nCars; k++) {
       const x = A + 12 + k * 6.5 + rnd() * 2, z = B - 9;
       addBox(bk, 'roof', 'roof', 1.9, 0.75, 4.4, x, ph + 0.55, z); addBox(bk, 'dark', 'dark', 1.6, 0.5, 2.2, x, ph + 1.15, z + 0.3);
+      solids.push({ x0: x - 0.95, x1: x + 0.95, z0: z - 2.2, z1: z + 2.2, y0: 0, y1: 1.4 });
     }
     signChance = 0; lampOn = 0.6;
   } else if (zone === 'residential') {
@@ -654,13 +657,13 @@ function genCell(i, j) {
     lampOn = 0.65;
   } else if (zone === 'fog') {
     // P7 (first pass): low, sparse, most lamps dead
-    plinth(1);
-    if (rnd() < 0.6) tower(win(), 16 + rnd() * 20, 12 + rnd() * 18, 16 + rnd() * 20, mid + (rnd() - 0.5) * 20, mid + (rnd() - 0.5) * 20, ph);
+    plinth(FLAT);
+    if (rnd() < 0.6) { const fw = 16 + rnd() * 20, fd = 16 + rnd() * 20; tower(win(), fw, 12 + rnd() * 18, fd, mid + (rnd() - 0.5) * (L - fw), mid + (rnd() - 0.5) * (L - fd), ph); }
     lampOn = 0.35;
   } else {
     // corner: the ordinary mixed city, the only place with street-level neon
     const vacant = rnd() < 0.14;
-    plinth(vacant ? 0.35 : 1.6 + rnd() * 3.5);
+    plinth(vacant ? FLAT : 1.6 + rnd() * 3.5);
     if (rnd() < 0.25) { const k = neon(); addBox(bk, k, k, L + 0.1, 0.18, 0.18, mid, ph - 0.35, A - 0.02); }
     if (rnd() < 0.15) { const k = neon(); addBox(bk, k, k, 0.18, 0.18, L + 0.1, A - 0.02, ph - 0.35, mid); }
     const t = rnd();
@@ -669,8 +672,9 @@ function genCell(i, j) {
       addBox(bk, 'roof', 'roof', 1.2, 2.0, 0.8, vx, ph + 1.0, vz + 0.4);
       addBox(bk, 'vend', 'vend', 0.9, 1.4, 0.04, vx, ph + 1.15, vz - 0.02);
       addFlat(bk, 'glowc', vx, vz - 1, 6, ph + 0.03);
+      solids.push({ x0: vx - 0.6, x1: vx + 0.6, z0: vz, z1: vz + 0.8, y0: 0, y1: 2 });
     } else if (t < 0.5) { // monolith tower with a cantilevered crown
-      const w = 24 + rnd() * 30, d = 20 + rnd() * 32, h = 35 + Math.pow(rnd(), 1.6) * 150;
+      const w = Math.min(24 + rnd() * 30, L - 2), d = Math.min(20 + rnd() * 32, L - 2), h = 35 + Math.pow(rnd(), 1.6) * 150;
       const cx = A + 1 + w / 2 + rnd() * Math.max(0, L - 2 - w), cz = A + 1 + d / 2 + rnd() * Math.max(0, L - 2 - d);
       addBox(bk, win(), 'roof', w, h, d, cx, ph + h / 2, cz, rnd);
       facades.push({ x0: cx - w / 2, x1: cx + w / 2, z0: cz - d / 2, z1: cz + d / 2, y0: ph, y1: ph + h });
@@ -679,13 +683,15 @@ function genCell(i, j) {
         const w2 = Math.min(w + 6 + rnd() * 8, L + 4), d2 = Math.min(d + 4 + rnd() * 6, L + 4), h2 = 8 + rnd() * 14;
         const cx2 = clamp(cx, A - 2 + w2 / 2, B + 2 - w2 / 2), cz2 = clamp(cz, A - 2 + d2 / 2, B + 2 - d2 / 2);
         addBox(bk, win(), 'roof', w2, h2, d2, cx2, topY + h2 / 2, cz2, rnd);
+        solids.push({ x0: cx2 - w2 / 2, x1: cx2 + w2 / 2, z0: cz2 - d2 / 2, z1: cz2 + d2 / 2, y0: topY, y1: topY + h2 });
         topY += h2; rw = w2; rd = d2; rx = cx2; rz = cz2;
       }
       if (rnd() < 0.45) { const step = 8 + rnd() * 6; for (let y = ph + step; y < ph + h - 2; y += step) addBox(bk, 'concrete', 'concrete', w + 2, 0.7, d + 2, cx, y, cz); }
       roofs.push({ x: rx, z: rz, w: rw, d: rd, y: topY });
     } else { // inverted ziggurat
       let w = 22 + rnd() * 10, d = 22 + rnd() * 10, y = ph;
-      addBox(bk, 'concrete', 'roof', w * 0.55, 10, d * 0.55, mid, y + 5, mid); y += 10;
+      addBox(bk, 'concrete', 'roof', w * 0.55, 10, d * 0.55, mid, y + 5, mid);
+      solids.push({ x0: mid - w * 0.275, x1: mid + w * 0.275, z0: mid - d * 0.275, z1: mid + d * 0.275, y0: 0, y1: y + 10 }); y += 10;
       const levels = 3 + Math.floor(rnd() * 3);
       for (let l = 0; l < levels; l++) {
         const hh = 8 + rnd() * 8; addBox(bk, win(), 'roof', w, hh, d, mid, y + hh / 2, mid, rnd);
@@ -774,10 +780,11 @@ function genCell(i, j) {
     if (on) addFlat(bk, gk, x + dx * 4, z + dz * 4, 22, 0.05);
   };
   for (const q of [R + 10, R + 36, R + 62]) { lamp(R + 0.8, q, -1, 0); lamp(q, R + 0.8, 0, -1); }
+  for (const q of [R + 23, R + 49]) { lamp(-0.8, q, 1, 0); lamp(q, -0.8, 0, 1); }   // the far side of each road, staggered
 
-  if (mom) momentPos = buildMoment(mom, { i, j, bk, grp, rnd, ph, mid, facades, extras, ticks, solo }) || momentPos;
-  for (const f of facades) solids.push({ x0: f.x0, x1: f.x1, z0: f.z0, z1: f.z1, y0: 0, y1: f.y1 });
-  for (const q of roofs) solids.push({ x0: q.x - q.w / 2, x1: q.x + q.w / 2, z0: q.z - q.d / 2, z1: q.z + q.d / 2, y0: 0, y1: q.y });
+  if (mom) momentPos = buildMoment(mom, { i, j, bk, grp, rnd, ph, mid, facades, extras, ticks, solo, solids }) || momentPos;
+  for (const f of facades) solids.push({ x0: f.x0, x1: f.x1, z0: f.z0, z1: f.z1, y0: f.y0 <= ph + 0.5 ? 0 : f.y0, y1: f.y1 });
+  for (const q of roofs) solids.push({ x0: q.x - q.w / 2, x1: q.x + q.w / 2, z0: q.z - q.d / 2, z1: q.z + q.d / 2, y0: Math.max(0, q.y - 3), y1: q.y });
 
   flush(bk, grp, geos);
   scene.add(grp);
@@ -802,8 +809,9 @@ function panFor(wx, wz) { // -1 left … +1 right, relative to where the car is 
 // Builds a moment into its block. u runs along the road the car arrived on; o is the distance out from the lot
 // edge toward that road (negative = into the lot). Side 0 is the lot's -x edge, side 2 its -z edge.
 function buildMoment(m, c) {
-  const { i, j, bk, grp, rnd, ph, mid, facades, extras, ticks } = c, S = m.side;
+  const { i, j, bk, grp, rnd, ph, mid, facades, extras, ticks, solids } = c, S = m.side;
   const at = (u, o, y) => S === 0 ? [A - o, y, u] : [u, y, A - o];
+  const solidAt = (along, out, u, o, h) => { const [x, , z] = at(u, o, 0); solids.push(S === 0 ? { x0: x - out / 2, x1: x + out / 2, z0: z - along / 2, z1: z + along / 2, y0: 0, y1: h } : { x0: x - along / 2, x1: x + along / 2, z0: z - out / 2, z1: z + out / 2, y0: 0, y1: h }); };
   const blk = (key, along, h, out, u, o, y) => { const [x, yy, z] = at(u, o, y); if (S === 0) addBox(bk, key, key, out, h, along, x, yy, z); else addBox(bk, key, key, along, h, out, x, yy, z); };
   const flat = (key, u, o, size, y) => { const [x, yy, z] = at(u, o, y); addFlat(bk, key, x, z, size, yy); };
   const world = (u, o, y) => { const [x, yy, z] = at(u, o, y); return new THREE.Vector3(i * C + x, yy, j * C + z); };
@@ -839,6 +847,7 @@ function buildMoment(m, c) {
     blk('pole', 2.6, 0.1, 0.5, u0 + 2.6, -14, ph + 0.45);
     for (const du of [1.4, 2.6, 3.8]) blk('pole', 0.07, 0.32, 0.5, u0 + du, -14, ph + 0.62);
     blk('concrete', 1.4, 1.2, 1.4, u0, -22, ph + 0.6); blk('roof', 0.5, 2.3, 0.4, u0, -22, ph + 2.35);
+    solidAt(1.4, 1.4, u0, -22, 3.5); solidAt(0.4, 0.4, u0, -14, 9); solidAt(2.6, 0.6, u0 + 2.6, -14, 0.8);
     const sg = S === 0 ? new THREE.PlaneGeometry(36, 1.1) : new THREE.PlaneGeometry(1.1, 36);
     const sm = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
     const shadow = new THREE.Mesh(sg, sm); const [x, , z] = at(u0, -41, 0);
@@ -869,6 +878,7 @@ function buildMoment(m, c) {
     for (const du of [-1.4, -0.3, 0.8]) blk('pole', 0.07, 0.3, 0.45, ub + du, 1.4, 0.62);
     blk('pole', 0.1, 2.8, 0.1, ub - 3.2, 3.2, 1.4); blk('fluo', 0.5, 0.5, 0.06, ub - 3.2, 3.2, 2.7);
     flat('glowc', ub, 3, 10, 0.06);
+    solidAt(5, 1.8, ub, 1.9, 2.6); solidAt(0.2, 0.2, ub - 3.2, 3.2, 2.8);
     return world(ub, 2, 0);
   }
   if (m.type === 'diner') {
@@ -888,6 +898,7 @@ function buildMoment(m, c) {
     flat('glowd', um, 5.5, 18, 0.05);                                      // green light spilling onto the wet road
     const up = A + 37;
     blk('pole', 0.12, 2.1, 0.12, up, 1.2, 1.05); blk('roof', 0.9, 1.0, 0.5, up, 1.2, 1.75); blk('fluo', 0.5, 0.25, 0.05, up, 1.47, 2.0);
+    solidAt(12.4, 3.8, um, 2.0, 3.5); solidAt(0.9, 0.5, up, 1.2, 2.2);
     const pp = world(up, 1.2, 0); let nextRing = 0, rung = 0, done = false;
     ticks.push((dt, t) => {
       if (done) return;
@@ -1034,6 +1045,7 @@ function groundMaterial() {
   const both = (col, fn) => { a.fillStyle = col; fn(a); b.fillStyle = col; fn(b); };
   // centre dashes
   both('#c08a2a', x => { for (let k = rp + 2 * u; k < S - 2 * u; k += 6 * u) { x.fillRect(rp / 2 - 0.2 * u, k, 0.4 * u, 3 * u); x.fillRect(k, rp / 2 - 0.2 * u, 3 * u, 0.4 * u); } });
+  both('#4a4b50', x => { for (const f of [0.18, 0.34, 0.66, 0.82]) for (let k = rp + 3 * u; k < S - 3 * u; k += 9 * u) { x.fillRect(rp * f - 0.1 * u, k, 0.2 * u, 3 * u); x.fillRect(k, rp * f - 0.1 * u, 3 * u, 0.2 * u); } }); // lane dashes
   // edge lines
   both('#55565c', x => { x.fillRect(rp - 1.1 * u, rp, 0.2 * u, S - rp); x.fillRect(0.9 * u, rp, 0.2 * u, S - rp); x.fillRect(rp, rp - 1.1 * u, S - rp, 0.2 * u); x.fillRect(rp, 0.9 * u, S - rp, 0.2 * u); });
   // crosswalks at both ends of each road segment
@@ -1919,8 +1931,8 @@ function suspension(dt) {
 }
 // Flying: the towers, bridges, decks and monuments are solid. Walls push you away; come down on a roof and you land on it.
 function collideAir() {
-  const r = 2.1, y = car.alt + 1.35;
-  const i0 = Math.floor((car.pos.x - r) / C), i1 = Math.floor((car.pos.x + r) / C), j0 = Math.floor((car.pos.z - r) / C), j1 = Math.floor((car.pos.z + r) / C);
+  const r = 2.1, y = car.alt + 1.35, M = 12;
+  const i0 = Math.floor((car.pos.x - r - M) / C), i1 = Math.floor((car.pos.x + r + M) / C), j0 = Math.floor((car.pos.z - r - M) / C), j1 = Math.floor((car.pos.z + r + M) / C);
   for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
     const c = cells.get(i + ',' + j); if (!c || !c.solids) continue;
     for (const b of c.solids) {
@@ -1941,21 +1953,29 @@ function collideAir() {
     }
   }
 }
+// On the ground: anything standing on the ground taller than a kerb is solid (walls, columns, parked cars, benches).
+// Flush paving, aprons and empty lots are open road.
 function collide() {
-  const r = 1.7, i = Math.floor(car.pos.x / C), j = Math.floor(car.pos.z / C);
-  const lx = car.pos.x - i * C, lz = car.pos.z - j * C;
-  if (lx > A - r && lx < B + r && lz > A - r && lz < B + r) {
-    const pens = [lx - (A - r), (B + r) - lx, lz - (A - r), (B + r) - lz];
-    let m = 0; for (let k = 1; k < 4; k++) if (pens[k] < pens[m]) m = k;
-    const n = [[-1, 0], [1, 0], [0, -1], [0, 1]][m];
-    car.pos.x += n[0] * pens[m]; car.pos.z += n[1] * pens[m];
-    const vn = car.vel.x * n[0] + car.vel.z * n[1];
-    if (vn < 0) {
-      car.vel.x -= n[0] * vn * 1.25; car.vel.z -= n[1] * vn * 1.25;
-      car.vel.multiplyScalar(0.8);
-      car.speed = car.vel.dot(fwd);
-      const hit = Math.min(1, -vn / 20);
-      if (hit > 0.15) { car.bump = Math.max(car.bump, hit); radio.thump(hit); car.heaveV += hit * 1.5; car.rollV += (Math.random() - 0.5) * hit * 2; }
+  const r = 1.7, M = 12;
+  const i0 = Math.floor((car.pos.x - r - M) / C), i1 = Math.floor((car.pos.x + r + M) / C), j0 = Math.floor((car.pos.z - r - M) / C), j1 = Math.floor((car.pos.z + r + M) / C);
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+    const c = cells.get(i + ',' + j); if (!c || !c.solids) continue;
+    for (const b of c.solids) {
+      if (b.y0 > 1.5 || b.y1 < 0.6) continue;
+      const x0 = i * C + b.x0 - r, x1 = i * C + b.x1 + r, z0 = j * C + b.z0 - r, z1 = j * C + b.z1 + r;
+      if (car.pos.x <= x0 || car.pos.x >= x1 || car.pos.z <= z0 || car.pos.z >= z1) continue;
+      const pens = [car.pos.x - x0, x1 - car.pos.x, car.pos.z - z0, z1 - car.pos.z];
+      let m = 0; for (let k = 1; k < 4; k++) if (pens[k] < pens[m]) m = k;
+      const n = [[-1, 0], [1, 0], [0, -1], [0, 1]][m];
+      car.pos.x += n[0] * pens[m]; car.pos.z += n[1] * pens[m];
+      const vn = car.vel.x * n[0] + car.vel.z * n[1];
+      if (vn < 0) {
+        car.vel.x -= n[0] * vn * 1.25; car.vel.z -= n[1] * vn * 1.25;
+        car.vel.multiplyScalar(0.8);
+        car.speed = car.vel.dot(fwd);
+        const hit = Math.min(1, -vn / 20);
+        if (hit > 0.15) { car.bump = Math.max(car.bump, hit); radio.thump(hit); car.heaveV += hit * 1.5; car.rollV += (Math.random() - 0.5) * hit * 2; }
+      }
     }
   }
 }
