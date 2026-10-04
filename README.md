@@ -20,6 +20,7 @@ the city is simply not for you.
 | Q · E | Climb · descend (spaceship only; up to about 420 m, it holds height when you let go) |
 | Shift | Drift |
 | V | Switch vehicle: car → hoverboard → spaceship |
+| B | Next spaceship design (seven: one original, three by Codex, three by AGY) |
 | C | Camera: chase → cinematic → hood |
 | M · R · H | Music · rain · hide HUD |
 | Esc / P | Pause, with a map of where you've been tonight |
@@ -37,10 +38,23 @@ The city is endless and built block by block around the car (100 m blocks with 3
 inside their lots, so there is a drivable apron of paving around them, and empty lots are open ground.
 
 **Structures:** a low metro line runs over the road of every seventh row and a high line over every ninth
-column, with long lit trains; some roads pass under buildings (underpasses) or under lit footbridges; some
-towers stand on columns with a drivable car park underneath; some blocks have a lit ramp down to an
-underground car park (to look into only). There is exactly one gas station in the whole city, on the first
-road you drive.
+column, with long lit trains. You can land the spaceship on a moving train and ride it.
+
+- **Expressways.** Most districts lift one road onto an elevated expressway: 130 m ramps up to a deck 16 m
+  high and 18 m wide, on single T-piers, running 0.6–1 km over several junctions under sodium lamps. The
+  outer lanes stay at street level underneath. Green signs hang on the deck's face over each junction.
+- **Sunken underpasses.** Many districts drop one road into a tunnel: 80 m open ramps down to 7.5 m, then a
+  lit, covered tunnel under two or three junctions. The outer lanes and the road on top stay at street level.
+- **Multi-storey car parks** fill a whole lot: four open decks on an 18 m column grid, straight two-way ramps
+  that wind up the two sides, parked cars on every level, lamps on the open roof.
+- **Underground car parks** fill the ground under a whole lot: a 10 m ramp beside the road drops into one
+  wide, low room with 20 m between columns, strip lights and a few parked cars.
+- Some towers stand on a few great columns (about 20 m apart, 9 m headroom) that you can drive straight
+  through; some buildings bridge a road on four piers over a lit hall 14 m high; lit footbridges cross others.
+- There is exactly one gas station in the whole city, on the first road you drive. The first road also
+  takes you up the first expressway, past a car park; the first tunnel crosses under it.
+
+The maps show expressways as pale lines and tunnels as dashed ones.
 
 **The chase:** every couple of minutes a lone car appears ahead and drives off through the city. It waits if
 you fall back and runs if you close in; it shows as a red dot on the map. Stay right behind it for a moment
