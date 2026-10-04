@@ -165,6 +165,7 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
       <dt>Space · Shift</dt><dd>Booster · drift</dd>
       <dt>Q · E</dt><dd>Climb · descend (spaceship)</dd>
       <dt>V · C</dt><dd>Vehicle · camera</dd>
+      <dt>B · Q · E</dt><dd>Next spaceship · climb · descend</dd>
       <dt>M · R · H</dt><dd>Music · rain · hide HUD</dd>
       <dt>T</dt><dd>Night or day</dd>
     </dl>
@@ -188,6 +189,7 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
       <dt>Q · E</dt><dd>Climb · descend, in the spaceship</dd>
       <dt>Shift</dt><dd>Drift</dd>
       <dt>V</dt><dd>Switch car / hoverboard / spaceship</dd>
+      <dt>B</dt><dd>Next spaceship design (seven of them)</dd>
       <dt>C · M · R · H</dt><dd>Camera · music · rain · hide HUD</dd>
       <dt>T</dt><dd>Night or day</dd>
       <dt>Esc</dt><dd>Pause, and a map of where you've been</dd>
@@ -203,6 +205,767 @@ body.music-on .eq i{animation:eq 1.1s ease-in-out infinite}
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<!-- ship designs: begin -->
+<script>
+/* ships/codex-ships.js — by Codex, pasted unchanged */
+window.SHIP_DESIGNS_CODEX = [
+  {
+    name: 'Night Courier',
+    author: 'codex',
+    idea: 'A long state-service lifting slab rides on a buried hover ring and pushes forward with two low, overbuilt stern turbines.',
+    build(THREE, kit) {
+      const group = new THREE.Group();
+      const engines = [];
+      const engineGlows = [];
+      const add = (geometry, material, x, y, z) => {
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(x || 0, y || 0, z || 0);
+        group.add(mesh);
+        return mesh;
+      };
+
+      // The planform is the same blunt, repairable sheet-metal shape as a ministry van.
+      const plan = new THREE.Shape();
+      plan.moveTo(-0.76, -3.0);
+      plan.lineTo(0.76, -3.0);
+      plan.lineTo(1.12, -2.35);
+      plan.lineTo(1.18, 1.7);
+      plan.lineTo(0.86, 2.75);
+      plan.lineTo(0.42, 3.15);
+      plan.lineTo(-0.42, 3.15);
+      plan.lineTo(-0.86, 2.75);
+      plan.lineTo(-1.18, 1.7);
+      plan.lineTo(-1.12, -2.35);
+      plan.closePath();
+      const upperGeometry = new THREE.ExtrudeGeometry(plan, {
+        depth: 0.68,
+        bevelEnabled: true,
+        bevelThickness: 0.06,
+        bevelSize: 0.05,
+        bevelSegments: 1,
+        curveSegments: 1
+      });
+      upperGeometry.rotateX(-Math.PI / 2);
+      upperGeometry.translate(0, -0.34, 0);
+      add(upperGeometry, kit.mats.enamel, 0, 0.12, 0);
+
+      add(new THREE.BoxGeometry(2.2, 0.34, 4.55), kit.mats.dirty, 0, -0.42, 0.35);
+      add(new THREE.BoxGeometry(1.72, 0.12, 2.75), kit.mats.graphite, 0, -0.65, 0.45);
+      add(new THREE.BoxGeometry(1.56, 0.12, 2.15), kit.mats.grey, 0, 0.56, 0.55);
+
+      // Upright glass and narrow pillars make the cabin read like the game's saloon.
+      const windscreen = add(new THREE.BoxGeometry(1.44, 0.58, 0.07), kit.mats.glass, 0, 0.58, -1.31);
+      windscreen.rotation.x = -0.18;
+      const rearGlass = add(new THREE.BoxGeometry(1.3, 0.42, 0.06), kit.mats.glass, 0, 0.55, 1.67);
+      rearGlass.rotation.x = 0.12;
+      for (const side of [-1, 1]) {
+        add(new THREE.BoxGeometry(0.055, 0.48, 1.75), kit.mats.glass, side * 0.79, 0.55, 0.22);
+        add(new THREE.BoxGeometry(0.075, 0.62, 0.12), kit.mats.enamel, side * 0.82, 0.55, -0.45);
+        add(new THREE.BoxGeometry(0.075, 0.62, 0.12), kit.mats.enamel, side * 0.82, 0.55, 0.75);
+        add(new THREE.BoxGeometry(0.065, 0.08, 4.25), kit.mats.red, side * 1.13, -0.03, 0.12);
+      }
+
+      // Two separate turbine cans and simple tail plates: all function, no flourish.
+      for (const side of [-1, 1]) {
+        const can = add(new THREE.CylinderGeometry(0.31, 0.34, 1.18, 16), kit.mats.graphite, side * 0.7, -0.31, 2.48);
+        can.rotation.x = Math.PI / 2;
+        const engine = add(new THREE.CircleGeometry(0.25, 20), kit.amber(), side * 0.7, -0.31, 3.08);
+        engines.push(engine);
+        const glow = kit.glowSprite();
+        glow.position.set(side * 0.7, -0.31, 3.17);
+        group.add(glow);
+        engineGlows.push(glow);
+        const fin = add(new THREE.BoxGeometry(0.09, 0.58, 0.74), kit.mats.dirty, side * 1.03, 0.22, 2.54);
+        fin.rotation.z = side * -0.09;
+      }
+
+      add(new THREE.BoxGeometry(1.86, 0.1, 0.12), kit.mats.grey, 0, -0.28, -2.97);
+      for (const side of [-1, 1]) {
+        const lens = add(new THREE.CircleGeometry(0.105, 16), kit.mats.headlamp, side * 0.5, -0.06, -3.08);
+        lens.rotation.y = Math.PI;
+      }
+      add(new THREE.BoxGeometry(0.55, 0.055, 0.055), kit.mats.red, 0, 0.49, 2.97);
+
+      const underRing = add(new THREE.TorusGeometry(0.68, 0.045, 8, 28), kit.amber(), 0, -0.7, 0.1);
+      underRing.rotation.x = Math.PI / 2;
+
+      const groundGlow = kit.groundGlow(3.6, 6.4);
+      groundGlow.position.set(0, -0.78, 0);
+      group.add(groundGlow);
+
+      const underLight = new THREE.PointLight(0xff9a40, 1.05, 9, 2);
+      underLight.position.set(0, -0.62, 0.1);
+      group.add(underLight);
+
+      const headlamp = new THREE.SpotLight(0xfff1d6, 2.0, 85, 0.48, 0.65, 1.15);
+      headlamp.position.set(0, -0.02, -2.92);
+      headlamp.target.position.set(0, -1.7, -25);
+      group.add(headlamp);
+      group.add(headlamp.target);
+
+      return {
+        group,
+        engines,
+        engineGlows,
+        underRing,
+        groundGlow,
+        underLight,
+        headlamp,
+        trailPoints: [
+          new THREE.Vector3(-0.7, -0.31, 3.18),
+          new THREE.Vector3(0.7, -0.31, 3.18)
+        ]
+      };
+    }
+  },
+  {
+    name: 'Ring Tender',
+    author: 'codex',
+    idea: 'A broad annular lift frame carries a tiny heated cabin in its empty centre while paired stern motors provide quiet forward motion.',
+    build(THREE, kit) {
+      const group = new THREE.Group();
+      const engines = [];
+      const engineGlows = [];
+      const add = (geometry, material, x, y, z) => {
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(x || 0, y || 0, z || 0);
+        group.add(mesh);
+        return mesh;
+      };
+      const bar = (from, to, material, thickness) => {
+        const delta = new THREE.Vector3().subVectors(to, from);
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(thickness, thickness, delta.length()), material);
+        mesh.position.copy(from).addScaledVector(delta, 0.5);
+        mesh.lookAt(to);
+        group.add(mesh);
+        return mesh;
+      };
+
+      const frame = add(new THREE.TorusGeometry(2.18, 0.28, 12, 32), kit.mats.dirty, 0, -0.02, 0);
+      frame.rotation.x = Math.PI / 2;
+      const innerRail = add(new THREE.TorusGeometry(1.73, 0.075, 8, 32), kit.mats.graphite, 0, 0.01, 0);
+      innerRail.rotation.x = Math.PI / 2;
+
+      // Four coarse braces suspend the one-person cabin inside the lift annulus.
+      bar(new THREE.Vector3(-1.85, 0, 0), new THREE.Vector3(-0.58, 0.03, 0), kit.mats.grey, 0.12);
+      bar(new THREE.Vector3(1.85, 0, 0), new THREE.Vector3(0.58, 0.03, 0), kit.mats.grey, 0.12);
+      bar(new THREE.Vector3(0, 0, -1.85), new THREE.Vector3(0, 0.03, -0.75), kit.mats.grey, 0.12);
+      bar(new THREE.Vector3(0, 0, 1.85), new THREE.Vector3(0, 0.03, 0.75), kit.mats.grey, 0.12);
+
+      const cabin = add(new THREE.SphereGeometry(1, 24, 16), kit.mats.enamel, 0, 0.12, -0.12);
+      cabin.scale.set(0.72, 0.55, 1.15);
+      const glass = add(new THREE.SphereGeometry(1, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), kit.mats.glass, 0, 0.35, -0.5);
+      glass.scale.set(0.54, 0.42, 0.72);
+      glass.rotation.x = -0.1;
+      add(new THREE.BoxGeometry(1.1, 0.13, 1.45), kit.mats.graphite, 0, -0.44, 0.02);
+      add(new THREE.BoxGeometry(0.065, 0.055, 2.05), kit.mats.red, 0, 0.59, 0.08);
+
+      // Rear motors sit on the ring like replaceable trolley components.
+      for (const side of [-1, 1]) {
+        const nacelle = add(new THREE.CylinderGeometry(0.29, 0.34, 1.05, 16), kit.mats.graphite, side * 1.35, 0.02, 1.95);
+        nacelle.rotation.x = Math.PI / 2;
+        add(new THREE.BoxGeometry(0.7, 0.11, 0.45), kit.mats.enamel, side * 1.35, 0.18, 1.92);
+        const engine = add(new THREE.CircleGeometry(0.255, 20), kit.amber(), side * 1.35, 0.02, 2.5);
+        engines.push(engine);
+        const glow = kit.glowSprite();
+        glow.position.set(side * 1.35, 0.02, 2.61);
+        group.add(glow);
+        engineGlows.push(glow);
+        add(new THREE.BoxGeometry(0.36, 0.055, 0.6), kit.mats.red, side * 2.07, 0.28, 0.72);
+      }
+
+      for (const side of [-1, 1]) {
+        const lens = add(new THREE.CircleGeometry(0.09, 16), kit.mats.headlamp, side * 0.3, 0.1, -1.27);
+        lens.rotation.y = Math.PI;
+      }
+
+      const underRing = add(new THREE.TorusGeometry(2.12, 0.052, 8, 32), kit.amber(), 0, -0.34, 0);
+      underRing.rotation.x = Math.PI / 2;
+
+      const groundGlow = kit.groundGlow(5.6, 5.6);
+      groundGlow.position.set(0, -0.62, 0);
+      group.add(groundGlow);
+
+      const underLight = new THREE.PointLight(0xff9a40, 1.0, 10, 2);
+      underLight.position.set(0, -0.5, 0);
+      group.add(underLight);
+
+      const headlamp = new THREE.SpotLight(0xfff1d6, 1.9, 82, 0.5, 0.65, 1.15);
+      headlamp.position.set(0, 0.1, -1.18);
+      headlamp.target.position.set(0, -1.8, -24);
+      group.add(headlamp);
+      group.add(headlamp.target);
+
+      return {
+        group,
+        engines,
+        engineGlows,
+        underRing,
+        groundGlow,
+        underLight,
+        headlamp,
+        trailPoints: [
+          new THREE.Vector3(-2.18, 0.04, 0.75),
+          new THREE.Vector3(2.18, 0.04, 0.75)
+        ]
+      };
+    }
+  },
+  {
+    name: 'Survey Capsule',
+    author: 'codex',
+    idea: 'A Vostok-like observation pod hangs from four exposed lift legs, flying as a slow mechanical insect rather than an aeroplane.',
+    build(THREE, kit) {
+      const group = new THREE.Group();
+      const engines = [];
+      const engineGlows = [];
+      const add = (geometry, material, x, y, z) => {
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(x || 0, y || 0, z || 0);
+        group.add(mesh);
+        return mesh;
+      };
+      const bar = (from, to, material, thickness) => {
+        const delta = new THREE.Vector3().subVectors(to, from);
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(thickness, thickness, delta.length()), material);
+        mesh.position.copy(from).addScaledVector(delta, 0.5);
+        mesh.lookAt(to);
+        group.add(mesh);
+        return mesh;
+      };
+
+      const pod = add(new THREE.SphereGeometry(1, 24, 16), kit.mats.dirty, 0, 0.15, -0.1);
+      pod.scale.set(0.86, 0.93, 1.32);
+      const belly = add(new THREE.CylinderGeometry(0.64, 0.72, 0.3, 20), kit.mats.graphite, 0, -0.69, 0.02);
+      belly.rotation.y = Math.PI / 8;
+      const collar = add(new THREE.TorusGeometry(0.75, 0.075, 8, 24), kit.mats.enamel, 0, -0.55, 0.02);
+      collar.rotation.x = Math.PI / 2;
+
+      const glass = add(new THREE.SphereGeometry(1, 20, 12), kit.mats.glass, 0, 0.35, -0.76);
+      glass.scale.set(0.57, 0.48, 0.58);
+      add(new THREE.BoxGeometry(0.06, 0.74, 0.08), kit.mats.enamel, 0, 0.35, -1.28);
+      add(new THREE.BoxGeometry(1.18, 0.055, 0.07), kit.mats.red, 0, -0.05, -1.33);
+
+      const legPositions = [
+        [-1.78, -1.18],
+        [1.78, -1.18],
+        [-1.78, 1.18],
+        [1.78, 1.18]
+      ];
+      for (let i = 0; i < legPositions.length; i += 1) {
+        const x = legPositions[i][0];
+        const z = legPositions[i][1];
+        const sx = Math.sign(x);
+        const sz = Math.sign(z);
+        bar(new THREE.Vector3(sx * 0.55, -0.28, sz * 0.55), new THREE.Vector3(x, -0.53, z), kit.mats.graphite, 0.105);
+        bar(new THREE.Vector3(sx * 0.38, 0.15, sz * 0.38), new THREE.Vector3(x, -0.53, z), kit.mats.grey, 0.075);
+        add(new THREE.CylinderGeometry(0.3, 0.36, 0.34, 16), kit.mats.enamel, x, -0.57, z);
+        const engine = add(new THREE.CylinderGeometry(0.235, 0.235, 0.045, 18), kit.amber(), x, -0.76, z);
+        engines.push(engine);
+        const glow = kit.glowSprite();
+        glow.position.set(x, -0.88, z);
+        group.add(glow);
+        engineGlows.push(glow);
+      }
+
+      // A plain tail boom and aerial make the pod directional without turning it into a fighter.
+      const tail = add(new THREE.CylinderGeometry(0.11, 0.16, 1.42, 12), kit.mats.grey, 0, 0.22, 1.78);
+      tail.rotation.x = Math.PI / 2;
+      const fin = add(new THREE.BoxGeometry(0.09, 0.72, 0.68), kit.mats.enamel, 0, 0.57, 2.25);
+      fin.rotation.x = -0.12;
+      add(new THREE.BoxGeometry(0.1, 0.62, 0.07), kit.mats.red, 0, 0.56, 2.59);
+      add(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 8), kit.mats.graphite, 0.28, 1.14, 0.38);
+
+      for (const side of [-1, 1]) {
+        const lens = add(new THREE.CircleGeometry(0.1, 16), kit.mats.headlamp, side * 0.28, -0.14, -1.34);
+        lens.rotation.y = Math.PI;
+      }
+
+      const underRing = add(new THREE.TorusGeometry(0.53, 0.045, 8, 24), kit.amber(), 0, -0.86, 0);
+      underRing.rotation.x = Math.PI / 2;
+
+      const groundGlow = kit.groundGlow(4.8, 4.5);
+      groundGlow.position.set(0, -0.9, 0);
+      group.add(groundGlow);
+
+      const underLight = new THREE.PointLight(0xff9a40, 1.15, 10, 2);
+      underLight.position.set(0, -0.75, 0);
+      group.add(underLight);
+
+      const headlamp = new THREE.SpotLight(0xfff1d6, 2.0, 86, 0.48, 0.65, 1.15);
+      headlamp.position.set(0, -0.12, -1.32);
+      headlamp.target.position.set(0, -1.8, -24);
+      group.add(headlamp);
+      group.add(headlamp.target);
+
+      return {
+        group,
+        engines,
+        engineGlows,
+        underRing,
+        groundGlow,
+        underLight,
+        headlamp,
+        trailPoints: [
+          new THREE.Vector3(-1.78, -0.62, 1.18),
+          new THREE.Vector3(1.78, -0.62, 1.18)
+        ]
+      };
+    }
+  }
+];
+
+</script>
+<script>
+/* ships/agy-ships.js — by AGY, pasted unchanged */
+// Spaceship designs for Concrete Nocturne — AGY
+// Conforming to SHIP_DESIGN_SPEC.md (three.js r128 primitives only, nose -Z, Soviet retro-futurist palette)
+
+(function () {
+  'use strict';
+
+  function createPlita74() {
+    return {
+      name: 'Plita-74',
+      author: 'agy',
+      idea: 'A blunt lifting slab manufactured from prefabricated state housing panels, riding on ground effect and three rear transom thrusters.',
+      build: function (THREE, kit) {
+        var group = new THREE.Group();
+        var engines = [];
+        var engineGlows = [];
+
+        var addMesh = function (geo, mat, x, y, z, rx, ry, rz) {
+          var m = new THREE.Mesh(geo, mat);
+          m.position.set(x || 0, y || 0, z || 0);
+          if (rx) m.rotation.x = rx;
+          if (ry) m.rotation.y = ry;
+          if (rz) m.rotation.z = rz;
+          group.add(m);
+          return m;
+        };
+
+        // 1. Lower Hull & Beveled Nose
+        addMesh(new THREE.BoxGeometry(2.6, 0.42, 4.4), kit.mats.enamel, 0, -0.22, 0.2);
+        addMesh(new THREE.BoxGeometry(2.4, 0.38, 1.4), kit.mats.dirty, 0, -0.24, -2.1);
+        addMesh(new THREE.BoxGeometry(2.36, 0.12, 1.4), kit.mats.dirty, 0, 0.06, -2.1, 0.14, 0, 0);
+        addMesh(new THREE.BoxGeometry(2.46, 0.22, 0.22), kit.mats.graphite, 0, -0.28, -2.8);
+
+        // 2. Upper Superstructure & Windshield
+        addMesh(new THREE.BoxGeometry(1.9, 0.52, 3.2), kit.mats.enamel, 0, 0.22, 0.3);
+        addMesh(new THREE.BoxGeometry(1.88, 0.34, 0.6), kit.mats.graphite, 0, 0.26, -1.35);
+        addMesh(new THREE.BoxGeometry(1.7, 0.18, 0.08), kit.mats.glass, 0, 0.26, -1.65);
+        addMesh(new THREE.BoxGeometry(1.86, 0.06, 0.26), kit.mats.enamel, 0, 0.38, -1.6);
+
+        // 3. Side Sponsons & Louvers
+        for (var s = -1; s <= 1; s += 2) {
+          addMesh(new THREE.BoxGeometry(0.32, 0.46, 4.2), kit.mats.dirty, s * 1.42, -0.15, 0.3);
+          addMesh(new THREE.BoxGeometry(0.32, 0.44, 0.8), kit.mats.graphite, s * 1.38, -0.16, -1.9, 0, s * -0.22, 0);
+          addMesh(new THREE.BoxGeometry(0.02, 0.06, 4.0), kit.mats.red, s * 1.59, 0.05, 0.3);
+          for (var lz = 0.0; lz <= 1.2; lz += 0.5) {
+            addMesh(new THREE.BoxGeometry(0.04, 0.04, 0.36), kit.mats.graphite, s * 1.59, -0.12, lz);
+          }
+        }
+
+        // 4. Dorsal Spine & Fittings
+        addMesh(new THREE.BoxGeometry(0.14, 0.02, 3.0), kit.mats.red, 0, 0.49, 0.3);
+        addMesh(new THREE.BoxGeometry(0.24, 0.08, 3.2), kit.mats.graphite, 0, 0.52, 0.3);
+        addMesh(new THREE.CylinderGeometry(0.03, 0.03, 0.42, 8), kit.mats.graphite, -0.6, 0.68, 0.8);
+        addMesh(new THREE.BoxGeometry(0.55, 0.04, 0.75), kit.mats.grey, 0.42, 0.49, 0.6);
+
+        // 5. Belly Plate & Skid Runners
+        addMesh(new THREE.BoxGeometry(1.4, 0.08, 3.0), kit.mats.concrete, 0, -0.46, 0.1);
+        addMesh(new THREE.BoxGeometry(0.18, 0.16, 4.2), kit.mats.graphite, -0.85, -0.52, 0.2);
+        addMesh(new THREE.BoxGeometry(0.18, 0.16, 4.2), kit.mats.graphite, 0.85, -0.52, 0.2);
+
+        // 6. Rear Transom & 3 Engines
+        addMesh(new THREE.BoxGeometry(2.5, 0.6, 0.2), kit.mats.graphite, 0, -0.05, 2.45);
+        var engineOffsets = [-0.74, 0, 0.74];
+        for (var i = 0; i < engineOffsets.length; i++) {
+          var ex = engineOffsets[i];
+          var ey = i === 1 ? 0.04 : -0.04;
+          var cowlGeo = new THREE.CylinderGeometry(0.24, 0.28, 0.48, 16);
+          cowlGeo.rotateX(Math.PI / 2);
+          addMesh(cowlGeo, kit.mats.grey, ex, ey, 2.65);
+
+          var portGeo = new THREE.CircleGeometry(0.2, 16);
+          var portMesh = new THREE.Mesh(portGeo, kit.amber());
+          portMesh.position.set(ex, ey, 2.9);
+          group.add(portMesh);
+          engines.push(portMesh);
+
+          var glow = kit.glowSprite();
+          glow.position.set(ex, ey, 3.04);
+          group.add(glow);
+          engineGlows.push(glow);
+        }
+
+        // 7. Hover Ring
+        var ringGeo = new THREE.TorusGeometry(0.85, 0.05, 8, 32);
+        ringGeo.rotateX(Math.PI / 2);
+        var underRing = new THREE.Mesh(ringGeo, kit.amber());
+        underRing.position.set(0, -0.54, -0.2);
+        group.add(underRing);
+
+        // 8. Headlamps & Forward SpotLight
+        addMesh(new THREE.CircleGeometry(0.11, 14), kit.mats.headlamp, -0.75, -0.26, -2.92, 0, Math.PI, 0);
+        addMesh(new THREE.CircleGeometry(0.11, 14), kit.mats.headlamp, 0.75, -0.26, -2.92, 0, Math.PI, 0);
+
+        var headlamp = new THREE.SpotLight(0xfff1d6, 2.2, 90, 0.5, 0.6, 1.1);
+        headlamp.position.set(0, -0.22, -2.85);
+        headlamp.target.position.set(0, -1.4, -25);
+        group.add(headlamp);
+        group.add(headlamp.target);
+
+        // 9. Ground Glow & UnderLight
+        var groundGlow = kit.groundGlow(4.2, 6.2);
+        if (groundGlow) {
+          groundGlow.position.set(0, -0.65, 0);
+          group.add(groundGlow);
+        }
+
+        var underLight = new THREE.PointLight(0xff9a40, 1.2, 9, 2);
+        underLight.position.set(0, -0.6, 0);
+        group.add(underLight);
+
+        // 10. Trail Points (outer sponson tips)
+        var trailPoints = [
+          new THREE.Vector3(-1.55, -0.1, 2.45),
+          new THREE.Vector3(1.55, -0.1, 2.45)
+        ];
+
+        return {
+          group: group,
+          engines: engines,
+          engineGlows: engineGlows,
+          underRing: underRing,
+          groundGlow: groundGlow,
+          underLight: underLight,
+          headlamp: headlamp,
+          trailPoints: trailPoints
+        };
+      }
+    };
+  }
+
+  function createKoltso3() {
+    return {
+      name: 'Koltso-3',
+      author: 'agy',
+      idea: 'An annular aerostat with a central spherical observation cabin suspended inside a heavy hover ring, designed for steady night surveillance.',
+      build: function (THREE, kit) {
+        var group = new THREE.Group();
+        var engines = [];
+        var engineGlows = [];
+
+        var addMesh = function (geo, mat, x, y, z, rx, ry, rz) {
+          var m = new THREE.Mesh(geo, mat);
+          m.position.set(x || 0, y || 0, z || 0);
+          if (rx) m.rotation.x = rx;
+          if (ry) m.rotation.y = ry;
+          if (rz) m.rotation.z = rz;
+          group.add(m);
+          return m;
+        };
+
+        // 1. Outer Torus Ring
+        var mainRingGeo = new THREE.TorusGeometry(1.85, 0.34, 16, 32);
+        mainRingGeo.rotateX(Math.PI / 2);
+        addMesh(mainRingGeo, kit.mats.enamel, 0, 0.05, 0);
+
+        var rimGeo = new THREE.TorusGeometry(1.88, 0.07, 10, 32);
+        rimGeo.rotateX(Math.PI / 2);
+        addMesh(rimGeo, kit.mats.graphite, 0, -0.18, 0);
+
+        // Red livery arc accents on outer ring
+        var redArc1 = new THREE.TorusGeometry(2.18, 0.025, 6, 16, Math.PI * 0.4);
+        redArc1.rotateX(Math.PI / 2);
+        addMesh(redArc1, kit.mats.red, 0, 0.05, 0, 0, -Math.PI * 0.2, 0);
+        var redArc2 = new THREE.TorusGeometry(2.18, 0.025, 6, 16, Math.PI * 0.4);
+        redArc2.rotateX(Math.PI / 2);
+        addMesh(redArc2, kit.mats.red, 0, 0.05, 0, 0, Math.PI * 0.8, 0);
+
+        // 2. Central Gondola / Crew Capsule
+        var gondola = addMesh(new THREE.SphereGeometry(0.85, 24, 18), kit.mats.dirty, 0, 0.15, -0.1);
+        gondola.scale.set(0.9, 0.85, 0.95);
+
+        // Panoramic visor window (curved front hemisphere sector)
+        var visor = addMesh(new THREE.SphereGeometry(0.86, 20, 14, 0, Math.PI, 0, Math.PI * 0.55), kit.mats.glass, 0, 0.15, -0.12, Math.PI * 0.35, Math.PI, 0);
+        visor.scale.set(0.75, 0.55, 0.85);
+
+        // Window collar bezel
+        var visorCollarGeo = new THREE.TorusGeometry(0.55, 0.035, 8, 24);
+        addMesh(visorCollarGeo, kit.mats.graphite, 0, 0.12, -0.84, 0.25, 0, 0);
+
+        // Roof avionics cap & antenna
+        addMesh(new THREE.CylinderGeometry(0.32, 0.42, 0.22, 16), kit.mats.graphite, 0, 0.86, -0.1);
+        addMesh(new THREE.CylinderGeometry(0.02, 0.02, 0.38, 8), kit.mats.grey, 0, 1.05, -0.1);
+
+        // 3. Three Radial Connecting Pylons (120 deg apart)
+        // Forward pylon (along -Z)
+        addMesh(new THREE.BoxGeometry(0.28, 0.2, 1.15), kit.mats.graphite, 0, 0.08, -1.25);
+        addMesh(new THREE.BoxGeometry(0.06, 0.04, 1.1), kit.mats.grey, 0, 0.2, -1.25);
+
+        // Aft-port pylon (120 deg)
+        addMesh(new THREE.BoxGeometry(0.28, 0.2, 1.15), kit.mats.graphite, -1.05, 0.08, 0.65, 0, -2.094, 0);
+        addMesh(new THREE.BoxGeometry(0.06, 0.04, 1.1), kit.mats.grey, -1.05, 0.2, 0.65, 0, -2.094, 0);
+
+        // Aft-starboard pylon (120 deg)
+        addMesh(new THREE.BoxGeometry(0.28, 0.2, 1.15), kit.mats.graphite, 1.05, 0.08, 0.65, 0, 2.094, 0);
+        addMesh(new THREE.BoxGeometry(0.06, 0.04, 1.1), kit.mats.grey, 1.05, 0.2, 0.65, 0, 2.094, 0);
+
+        // 4. Auxiliary Rear Booster Nacelles (Twin Engines)
+        for (var s = -1; s <= 1; s += 2) {
+          var nx = s * 1.35;
+          var nacelleGeo = new THREE.CylinderGeometry(0.24, 0.28, 1.25, 16);
+          nacelleGeo.rotateX(Math.PI / 2);
+          addMesh(nacelleGeo, kit.mats.graphite, nx, 0.06, 1.6);
+
+          var intakeGeo = new THREE.CylinderGeometry(0.22, 0.24, 0.2, 16);
+          intakeGeo.rotateX(Math.PI / 2);
+          addMesh(intakeGeo, kit.mats.dirty, nx, 0.06, 0.95);
+
+          // Fin on top of nacelle with red tip
+          addMesh(new THREE.BoxGeometry(0.04, 0.36, 0.6), kit.mats.enamel, nx, 0.42, 1.68);
+          addMesh(new THREE.BoxGeometry(0.05, 0.06, 0.58), kit.mats.red, nx, 0.61, 1.68);
+
+          // Engine port
+          var portMesh = new THREE.Mesh(new THREE.CircleGeometry(0.22, 16), kit.amber());
+          portMesh.position.set(nx, 0.06, 2.24);
+          group.add(portMesh);
+          engines.push(portMesh);
+
+          // Glow sprite
+          var glow = kit.glowSprite();
+          glow.position.set(nx, 0.06, 2.38);
+          group.add(glow);
+          engineGlows.push(glow);
+        }
+
+        // 5. Ventral Pulsing Stator Ring
+        var underRingGeo = new THREE.TorusGeometry(1.62, 0.048, 8, 36);
+        underRingGeo.rotateX(Math.PI / 2);
+        var underRing = new THREE.Mesh(underRingGeo, kit.amber());
+        underRing.position.set(0, -0.42, 0);
+        group.add(underRing);
+
+        // 6. Forward Searchlight / Headlamp
+        var lightCanGeo = new THREE.CylinderGeometry(0.16, 0.2, 0.26, 14);
+        lightCanGeo.rotateX(Math.PI / 2);
+        addMesh(lightCanGeo, kit.mats.graphite, 0, -0.14, -2.18);
+        addMesh(new THREE.CircleGeometry(0.15, 14), kit.mats.headlamp, 0, -0.14, -2.32, 0, Math.PI, 0);
+
+        var headlamp = new THREE.SpotLight(0xfff1d6, 2.3, 95, 0.52, 0.6, 1.1);
+        headlamp.position.set(0, -0.14, -2.3);
+        headlamp.target.position.set(0, -1.4, -25);
+        group.add(headlamp);
+        group.add(headlamp.target);
+
+        // 7. Ground Glow & UnderLight
+        var groundGlow = kit.groundGlow(5.0, 5.0);
+        if (groundGlow) {
+          groundGlow.position.set(0, -0.65, 0);
+          group.add(groundGlow);
+        }
+
+        var underLight = new THREE.PointLight(0xff9a40, 1.2, 10, 2);
+        underLight.position.set(0, -0.5, 0);
+        group.add(underLight);
+
+        // 8. Trail Points (outer ring equator edges)
+        var trailPoints = [
+          new THREE.Vector3(-2.18, 0.05, 0.2),
+          new THREE.Vector3(2.18, 0.05, 0.2)
+        ];
+
+        return {
+          group: group,
+          engines: engines,
+          engineGlows: engineGlows,
+          underRing: underRing,
+          groundGlow: groundGlow,
+          underLight: underLight,
+          headlamp: headlamp,
+          trailPoints: trailPoints
+        };
+      }
+    };
+  }
+
+  function createKarkas7() {
+    return {
+      name: 'Karkas-7',
+      author: 'agy',
+      idea: 'An unclad skeletal girder frame carrying a forward observation capsule and twin outrigger engine pods, built to service high-altitude communications masts.',
+      build: function (THREE, kit) {
+        var group = new THREE.Group();
+        var engines = [];
+        var engineGlows = [];
+
+        var addMesh = function (geo, mat, x, y, z, rx, ry, rz) {
+          var m = new THREE.Mesh(geo, mat);
+          m.position.set(x || 0, y || 0, z || 0);
+          if (rx) m.rotation.x = rx;
+          if (ry) m.rotation.y = ry;
+          if (rz) m.rotation.z = rz;
+          group.add(m);
+          return m;
+        };
+
+        // 1. Central Backbone / Girder Spine
+        addMesh(new THREE.BoxGeometry(0.34, 0.28, 4.6), kit.mats.graphite, 0, 0.15, 0.4);
+        addMesh(new THREE.BoxGeometry(0.22, 0.16, 4.4), kit.mats.graphite, 0, -0.15, 0.4);
+
+        // Vertical truss uprights
+        var zStops = [-1.2, -0.4, 0.4, 1.2, 2.0];
+        for (var i = 0; i < zStops.length; i++) {
+          addMesh(new THREE.BoxGeometry(0.24, 0.28, 0.12), kit.mats.graphite, 0, 0.0, zStops[i]);
+        }
+
+        // 2. Forward Perched Crew Capsule
+        addMesh(new THREE.SphereGeometry(0.72, 22, 16), kit.mats.enamel, 0, 0.25, -2.0);
+
+        // Faceted forward visor
+        var visorGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.32, 16);
+        visorGeo.rotateX(Math.PI / 2);
+        addMesh(visorGeo, kit.mats.glass, 0, 0.26, -2.46);
+
+        var collarGeo = new THREE.TorusGeometry(0.42, 0.035, 8, 20);
+        addMesh(collarGeo, kit.mats.graphite, 0, 0.26, -2.48);
+
+        // Side circular portholes
+        addMesh(new THREE.CircleGeometry(0.12, 12), kit.mats.glass, -0.66, 0.25, -2.0, 0, -Math.PI / 2, 0);
+        addMesh(new THREE.CircleGeometry(0.12, 12), kit.mats.glass, 0.66, 0.25, -2.0, 0, Math.PI / 2, 0);
+
+        // Red livery retention band around capsule
+        var capsuleBandGeo = new THREE.TorusGeometry(0.73, 0.022, 8, 24);
+        addMesh(capsuleBandGeo, kit.mats.red, 0, 0.25, -2.0);
+
+        // Cradle struts attaching pod to spine
+        addMesh(new THREE.BoxGeometry(0.12, 0.12, 0.55), kit.mats.graphite, 0, 0.05, -1.5, 0.4, 0, 0);
+
+        // 3. Spherical Propellant Flasks on Spine
+        var tankPositions = [-0.4, 0.9];
+        for (var t = 0; t < tankPositions.length; t++) {
+          var tz = tankPositions[t];
+          addMesh(new THREE.SphereGeometry(0.56, 20, 16), kit.mats.dirty, 0, 0.22, tz);
+          var strapGeo = new THREE.TorusGeometry(0.58, 0.03, 8, 24);
+          strapGeo.rotateX(Math.PI / 2);
+          addMesh(strapGeo, kit.mats.graphite, 0, 0.22, tz);
+        }
+        // Red inspection marking on front tank
+        var tankMarkGeo = new THREE.TorusGeometry(0.58, 0.02, 8, 20);
+        addMesh(tankMarkGeo, kit.mats.red, 0, 0.22, -0.4);
+
+        // 4. Outrigger Trusses & Twin Engine Pods
+        for (var s = -1; s <= 1; s += 2) {
+          var ex = s * 1.95;
+
+          // Main horizontal outrigger truss
+          addMesh(new THREE.BoxGeometry(1.65, 0.16, 0.26), kit.mats.graphite, s * 1.05, 0.22, 1.4, 0, 0, s * 0.12);
+          // Diagonal strut
+          addMesh(new THREE.BoxGeometry(1.7, 0.1, 0.12), kit.mats.graphite, s * 1.05, 0.06, 1.8, 0.25, 0, s * -0.15);
+
+          // Engine nacelle
+          var nacGeo = new THREE.CylinderGeometry(0.26, 0.32, 1.8, 16);
+          nacGeo.rotateX(Math.PI / 2);
+          addMesh(nacGeo, kit.mats.enamel, ex, 0.28, 1.9);
+
+          // Intake cowl
+          var inGeo = new THREE.CylinderGeometry(0.3, 0.26, 0.25, 16);
+          inGeo.rotateX(Math.PI / 2);
+          addMesh(inGeo, kit.mats.graphite, ex, 0.28, 0.95);
+
+          // Tall vertical rudder fin with red tip
+          addMesh(new THREE.BoxGeometry(0.04, 0.58, 0.8), kit.mats.dirty, ex, 0.74, 2.1);
+          addMesh(new THREE.BoxGeometry(0.05, 0.08, 0.78), kit.mats.red, ex, 1.03, 2.1);
+
+          // Engine disc
+          var portMesh = new THREE.Mesh(new THREE.CircleGeometry(0.24, 16), kit.amber());
+          portMesh.position.set(ex, 0.28, 2.81);
+          group.add(portMesh);
+          engines.push(portMesh);
+
+          // Glow sprite
+          var glow = kit.glowSprite();
+          glow.position.set(ex, 0.28, 2.95);
+          group.add(glow);
+          engineGlows.push(glow);
+        }
+
+        // 5. Ventral Landing Skids & Pylons
+        for (var s = -1; s <= 1; s += 2) {
+          var kx = s * 0.75;
+          var skidGeo = new THREE.CylinderGeometry(0.05, 0.05, 3.8, 10);
+          skidGeo.rotateX(Math.PI / 2);
+          addMesh(skidGeo, kit.mats.graphite, kx, -0.62, 0.3);
+
+          // Upright struts
+          addMesh(new THREE.BoxGeometry(0.08, 0.48, 0.08), kit.mats.graphite, kx, -0.38, -0.8);
+          addMesh(new THREE.BoxGeometry(0.08, 0.48, 0.08), kit.mats.graphite, kx, -0.38, 1.4);
+        }
+
+        // 6. Ventral Hover Ring
+        var hoverRingGeo = new THREE.TorusGeometry(0.55, 0.04, 8, 28);
+        hoverRingGeo.rotateX(Math.PI / 2);
+        var underRing = new THREE.Mesh(hoverRingGeo, kit.amber());
+        underRing.position.set(0, -0.42, 0.3);
+        group.add(underRing);
+
+        // 7. Underslung Searchlight / Headlamp
+        var headCanGeo = new THREE.CylinderGeometry(0.15, 0.18, 0.28, 14);
+        headCanGeo.rotateX(Math.PI / 2);
+        addMesh(headCanGeo, kit.mats.graphite, 0, -0.22, -2.1);
+        addMesh(new THREE.CircleGeometry(0.14, 14), kit.mats.headlamp, 0, -0.22, -2.25, 0, Math.PI, 0);
+
+        var headlamp = new THREE.SpotLight(0xfff1d6, 2.3, 95, 0.5, 0.6, 1.1);
+        headlamp.position.set(0, -0.22, -2.25);
+        headlamp.target.position.set(0, -1.4, -25);
+        group.add(headlamp);
+        group.add(headlamp.target);
+
+        // 8. Ground Glow & UnderLight
+        var groundGlow = kit.groundGlow(4.5, 6.0);
+        if (groundGlow) {
+          groundGlow.position.set(0, -0.7, 0);
+          group.add(groundGlow);
+        }
+
+        var underLight = new THREE.PointLight(0xff9a40, 1.2, 9, 2);
+        underLight.position.set(0, -0.55, 0.2);
+        group.add(underLight);
+
+        // 9. Trail Points (outer rudder fin tips)
+        var trailPoints = [
+          new THREE.Vector3(-1.95, 0.3, 2.5),
+          new THREE.Vector3(1.95, 0.3, 2.5)
+        ];
+
+        return {
+          group: group,
+          engines: engines,
+          engineGlows: engineGlows,
+          underRing: underRing,
+          groundGlow: groundGlow,
+          underLight: underLight,
+          headlamp: headlamp,
+          trailPoints: trailPoints
+        };
+      }
+    };
+  }
+
+  var designs = [createPlita74(), createKoltso3(), createKarkas7()];
+
+  if (typeof window !== 'undefined') {
+    window.SHIP_DESIGNS_AGY = designs;
+  }
+  if (typeof global !== 'undefined') {
+    global.SHIP_DESIGNS_AGY = designs;
+  }
+})();
+
+</script>
+<!-- ship designs: end -->
 <script>
 (() => {
 'use strict';
@@ -385,13 +1148,16 @@ const mats = {
   glow: glowMat(0xff8a2a, 0.72),
   glowv: glowMat(0x7fcf9a, 0.32),
   glowd: glowMat(0x8fe0a4, 0.6),
-  glowf: glowMat(0xd6ecd0, 0.26),                                          // fluorescent spill: car parks, underpasses
+  glowf: glowMat(0xd6ecd0, 0.26),
+  asphalt: new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.75, side: THREE.DoubleSide }),
+  paint: new THREE.MeshStandardMaterial({ color: 0xb4b3ab, roughness: 0.9 }),                                          // fluorescent spill: car parks, underpasses
   glowg: glowMat(0xf2f6ff, 0.5),                                           // the gas station canopy
   gasWhite: new THREE.MeshStandardMaterial({ color: 0xd4d0c4, roughness: 0.6, emissive: 0x141410, emissiveIntensity: 0.4 }),
   gasRed: new THREE.MeshStandardMaterial({ color: 0x8e2a21, roughness: 0.5, emissive: 0x2a0806, emissiveIntensity: 0.7 }),
   beacon: new THREE.MeshBasicMaterial({ color: 0xff2040 }),
 };
 NEON.forEach((c, k) => { mats['neon' + k] = new THREE.MeshBasicMaterial({ color: c }); });
+mats.concreteD = mats.concrete.clone(); mats.concreteD.side = THREE.DoubleSide;   // for ramp walls built from prisms
 const UV = { concrete: [16, 16] };
 const uvFor = k => k.startsWith('win') ? [TEX_W, TEX_H] : (UV[k] || [4, 4]);
 
@@ -539,13 +1305,47 @@ function directorTick(dt) {
   director.musicDensity = director.litFraction;
 }
 
+/* ---------- bridges and sunken underpasses at junctions ---------- */
+// A road can rise on a ramp, cross a junction on a deck and come down again ('fly'), or dip into a short tunnel
+// under the junction and climb back out ('dip'). Decided per junction from a hash, so neighbours agree.
+const FLY_H = 8, DIP_D = 6.5, RAMP_L = 34;
+function junctionFeature(i, j, axis) {      // axis 'z': the z-road through junction (i, j); 'x': the x-road
+  if (axis === 'z' && i === 1 && j === 9) return 'fly';                     // one of each on the first road you drive
+  if (axis === 'z' && i === 1 && j === 4) return 'dip';
+  if (i === 1 && (j === 11 || j === 12 || j === GAS.j || j === GAS.j + 1)) return null;   // keep the start and the gas station level
+  if (metroOnX(j)) return null;                                              // the low metro over this junction leaves no room
+  if (axis === 'z' && metroOnZ(i)) return null;                              // the high line's columns stand in this road
+  if (axis === 'x' && junctionFeature(i, j, 'z')) return null;               // one feature per junction
+  const h = hash2(i, j, axis === 'z' ? 41 : 43) % 1000;
+  return h < 60 ? 'fly' : h < 110 ? 'dip' : null;
+}
+// A convex profile drawn in (along, height), extruded across [c0, c1]. axis 'z': the road runs along z.
+function prismGeo(profile, c0, c1, axis) {
+  const P = [], U = [], n = profile.length;
+  const v = (al, h, cr) => { if (axis === 'z') P.push(cr, h, al); else P.push(al, h, cr); U.push((al + cr) / 16, h / 16); };
+  const tri = (a, b, c) => { v(...a); v(...b); v(...c); };
+  for (let k = 1; k < n - 1; k++) {
+    tri([profile[0][0], profile[0][1], c0], [profile[k][0], profile[k][1], c0], [profile[k + 1][0], profile[k + 1][1], c0]);
+    tri([profile[0][0], profile[0][1], c1], [profile[k + 1][0], profile[k + 1][1], c1], [profile[k][0], profile[k][1], c1]);
+  }
+  for (let k = 0; k < n; k++) {
+    const a = profile[k], b = profile[(k + 1) % n];
+    tri([a[0], a[1], c0], [b[0], b[1], c0], [b[0], b[1], c1]); tri([a[0], a[1], c0], [b[0], b[1], c1], [a[0], a[1], c1]);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  g.computeVertexNormals(); return g;
+}
+
 /* ---------- city cell generator ---------- */
 function genCell(i, j) {
   const di = districtOf(i), dj = districtOf(j), zone = zoneFor(di, dj);
   const li = i - di * DS, lj = j - dj * DS;                                     // this block's place inside its district
   const rnd = mulberry(hash2(i, j, 7)), zr = mulberry(hash2(di, dj, 13));    // zr gives every block in a district the same numbers
   const bk = {}, grp = new THREE.Group(), geos = [], signMats = [], flick = [];
-  const solids = [];                                                           // boxes in block coordinates, for flight collision
+  const solids = [];                                                           // boxes in block coordinates, for collision
+  const surfaces = [], holes = [];                                             // drivable heights (ramps, decks, floors) and openings in the ground
+  const addMesh = (geo, key) => { const m = new THREE.Mesh(geo, mats[key]); grp.add(m); geos.push(geo); return m; };
   grp.position.set(i * C, 0, j * C);
   const mom = moments.cache.get(i + ',' + j), extras = [], ticks = [];   // this block's moment, if the director gave it one
   let momentPos = null;
@@ -581,16 +1381,47 @@ function genCell(i, j) {
     roofs.push({ x, z, w, d, y: base + h });
   };
   // P4: a lit ramp down to an underground car park, on the apron by the road. You can look; you can't go down.
+  // P4: an underground car park under the lot. A ramp runs down along the apron by the road; drive in, around, out.
   const ramp = () => {
-    const x0 = LOT_A + 0.8, zc = LOT_A + 18 + rnd() * 26, zl = 13;
-    addBox(bk, 'dark', 'dark', 5.2, 0.04, zl, x0 + 2.8, 0.03, zc);
-    for (const x of [x0 + 0.15, x0 + 5.45]) addBox(bk, 'concrete', 'concrete', 0.3, 1.1, zl, x, 0.55, zc);
-    addBox(bk, 'concrete', 'concrete', 5.6, 1.1, 0.3, x0 + 2.8, 0.55, zc + zl / 2);
-    addBox(bk, 'fluo', 'fluo', 4.6, 0.05, 0.4, x0 + 2.8, 0.06, zc + zl / 2 - 1.2);   // light coming up from below
-    addFlat(bk, 'glowf', x0 + 2.8, zc + zl / 2 - 2.5, 7, 0.07);
-    addBox(bk, 'pole', 'pole', 4.8, 0.08, 0.08, x0 + 2.8, 1.0, zc - zl / 2 + 0.3);    // the barrier arm, down
-    addBox(bk, 'pole', 'pole', 0.12, 3, 0.12, x0 + 5.9, 1.5, zc - zl / 2 - 0.6); addBox(bk, 'shelter', 'shelter', 0.08, 0.9, 0.9, x0 + 5.9, 3.2, zc - zl / 2 - 0.6);
-    solids.push({ x0: x0, x1: x0 + 5.6, z0: zc - zl / 2, z1: zc + zl / 2, y0: 0, y1: 1.1 });
+    const D = 6, x0 = LOT_A + 0.8, x1 = LOT_B - 0.8, z0 = LOT_A + 0.8, z1 = LOT_B - 0.8, xm = (x0 + x1) / 2, zm = (z0 + z1) / 2;
+    const rx0 = x0, rx1 = x0 + 5.8, rz0 = LOT_A + 4, rz1 = rz0 + 30;
+    holes.push([rx0 + 0.3, rz0, rx1, rz1]);
+    surfaces.push({ axis: 'z', x0: rx0, x1: rx1, z0: rz0, z1: rz1, h0: 0, h1: -D }, { axis: 'z', x0, x1, z0, z1, h0: -D, h1: -D });
+    addMesh(prismGeo([[rz0, -0.5], [rz1, -D - 0.5], [rz1, -D], [rz0, 0]], rx0 + 0.3, rx1, 'z'), 'asphalt');
+    addMesh(prismGeo([[rz0, -0.6], [rz1, -D - 0.6], [rz1, 1.1], [rz0, 1.1]], rx0, rx0 + 0.3, 'z'), 'concreteD');
+    addBox(bk, 'concrete', 'concrete', 0.3, 1.1, rz1 - rz0, rx1 + 0.15, 0.55, (rz0 + rz1) / 2);
+    solids.push({ x0: rx0, x1: rx0 + 0.3, z0: rz0, z1: rz1, y0: -D - 0.6, y1: 1.1 }, { x0: rx1, x1: rx1 + 0.3, z0: rz0, z1: rz1, y0: 0, y1: 1.1 });
+    // the room: floor, ceiling with the ramp's opening, four walls
+    addBox(bk, 'roof', 'roof', x1 - x0, 0.6, z1 - z0, xm, -D - 0.3, zm);
+    addBox(bk, 'concrete', 'concrete', x1 - rx1 - 0.3, 0.5, z1 - z0, (rx1 + 0.3 + x1) / 2, -0.3, zm);
+    addBox(bk, 'concrete', 'concrete', rx1 + 0.3 - x0, 0.5, rz0 - z0, (x0 + rx1 + 0.3) / 2, -0.3, (z0 + rz0) / 2);
+    addBox(bk, 'concrete', 'concrete', rx1 + 0.3 - x0, 0.5, z1 - rz1, (x0 + rx1 + 0.3) / 2, -0.3, (rz1 + z1) / 2);
+    for (const [x, z, w, d] of [[x0, zm, 0.4, z1 - z0], [x1, zm, 0.4, z1 - z0], [xm, z0, x1 - x0, 0.4], [xm, z1, x1 - x0, 0.4]]) {
+      addBox(bk, 'concrete', 'concrete', w, D, d, x, -D / 2, z);
+      solids.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, y0: -D, y1: -0.05 });
+    }
+    // columns, painted bays, parked cars, fluorescent strips
+    for (let x = rx1 + 8; x < x1 - 3; x += 12) for (let z = z0 + 9; z < z1 - 3; z += 12) {
+      addBox(bk, 'concrete', 'concrete', 0.8, D, 0.8, x, -D / 2, z);
+      solids.push({ x0: x - 0.4, x1: x + 0.4, z0: z - 0.4, z1: z + 0.4, y0: -D, y1: -0.05 });
+    }
+    for (const bz of [z0 + 3, z1 - 3]) for (let x = rx1 + 4; x < x1 - 2; x += 2.8) {
+      addBox(bk, 'paint', 'paint', 0.12, 0.02, 5, x, -D + 0.01, bz);
+      if (rnd() < 0.45) { const cx = x + 1.4; addBox(bk, 'roof', 'roof', 1.9, 0.75, 4.4, cx, -D + 0.55, bz); addBox(bk, 'dark', 'dark', 1.6, 0.5, 2.2, cx, -D + 1.15, bz + 0.3); solids.push({ x0: cx - 0.95, x1: cx + 0.95, z0: bz - 2.2, z1: bz + 2.2, y0: -D, y1: -D + 1.4 }); }
+    }
+    for (let z = z0 + 6; z < z1 - 2; z += 10) { addBox(bk, 'fluo', 'fluo', x1 - rx1 - 6, 0.05, 0.25, (rx1 + x1) / 2, -0.6, z); addFlat(bk, 'glowf', (rx1 + x1) / 2, z, 12, -D + 0.04); }
+    // the sign at the top of the ramp
+    addBox(bk, 'pole', 'pole', 0.12, 3, 0.12, rx1 + 0.9, 1.5, rz0 - 0.8); addBox(bk, 'shelter', 'shelter', 0.08, 0.9, 0.9, rx1 + 0.9, 3.2, rz0 - 0.8);
+    solids.push({ x0: rx1 + 0.8, x1: rx1 + 1.0, z0: rz0 - 0.9, z1: rz0 - 0.7, y0: 0, y1: 3.6 });
+  };
+  // P4: an open car park on an empty lot: painted bays, a few cars, one lamp
+  const openPark = () => {
+    for (const bz of [A + 8, B - 8]) for (let x = A + 2; x < B - 2; x += 2.8) {
+      addBox(bk, 'paint', 'paint', 0.12, 0.02, 5, x, ph + 0.02, bz);
+      if (rnd() < 0.4) { const cx = x + 1.4; addBox(bk, 'roof', 'roof', 1.9, 0.75, 4.4, cx, ph + 0.55, bz); addBox(bk, 'dark', 'dark', 1.6, 0.5, 2.2, cx, ph + 1.15, bz + 0.3); solids.push({ x0: cx - 0.95, x1: cx + 0.95, z0: bz - 2.2, z1: bz + 2.2, y0: 0, y1: 1.4 }); }
+    }
+    addBox(bk, 'pole', 'pole', 0.25, 8, 0.25, mid, 4, mid); addBox(bk, 'lamp', 'lamp', 0.8, 0.25, 0.8, mid, 8, mid); addFlat(bk, 'glow', mid, mid, 26, ph + 0.04);
+    solids.push({ x0: mid - 0.2, x1: mid + 0.2, z0: mid - 0.2, z1: mid + 0.2, y0: 0, y1: 8 });
   };
   const isGas = i === GAS.i && j === GAS.j;
   let ph = 1, signChance = 0, lampOn = 0.7;
@@ -745,6 +1576,7 @@ function genCell(i, j) {
     // P7 (first pass): low, sparse, most lamps dead
     plinth(FLAT);
     if (rnd() < 0.6) { const fw = 16 + rnd() * 20, fd = 16 + rnd() * 20; tower(win(), fw, 12 + rnd() * 18, fd, mid + (rnd() - 0.5) * (L - fw), mid + (rnd() - 0.5) * (L - fd), ph); }
+    else if (rnd() < 0.5) openPark();
     lampOn = 0.35;
   } else {
     // corner: the ordinary mixed city, the only place with street-level neon
@@ -754,6 +1586,7 @@ function genCell(i, j) {
     if (rnd() < 0.25) { const k = neon(); addBox(bk, k, k, L + 0.1, 0.18, 0.18, mid, ph - 0.35, A - 0.02); }
     if (rnd() < 0.15) { const k = neon(); addBox(bk, k, k, 0.18, 0.18, L + 0.1, A - 0.02, ph - 0.35, mid); }
     const t = rnd();
+    if (vacant && rnd() < 0.6) openPark();
     if (vacant) { // an empty lot: one vending machine glowing to nobody
       const vx = A + 3 + rnd() * (L - 6), vz = A + 1.2;
       addBox(bk, 'roof', 'roof', 1.2, 2.0, 0.8, vx, ph + 1.0, vz + 0.4);
@@ -847,6 +1680,43 @@ function genCell(i, j) {
     addBox(bk, 'pole', 'pole', 0.4, 5.5, 0.4, pos.x, r.y + 2.75, pos.z);
   }
 
+  // Bridges and sunken underpasses: this block holds its own junction's deck or tunnel plus the ramps on its road segments
+  const zf0 = junctionFeature(i, j, 'z'), zf1 = junctionFeature(i, j + 1, 'z'), xf0 = junctionFeature(i, j, 'x'), xf1 = junctionFeature(i + 1, j, 'x');
+  const roadRamp = (axis, kind, a0, a1, h0, h1) => {   // one ramp along this block's road segment
+    const box = (c0, c1, b0, b1, y0, y1) => solids.push(axis === 'z' ? { x0: c0, x1: c1, z0: b0, z1: b1, y0, y1 } : { x0: b0, x1: b1, z0: c0, z1: c1, y0, y1 });
+    surfaces.push(axis === 'z' ? { axis, x0: 0.5, x1: R - 0.5, z0: a0, z1: a1, h0, h1 } : { axis, x0: a0, x1: a1, z0: 0.5, z1: R - 0.5, h0, h1 });
+    if (kind === 'fly') {
+      addMesh(prismGeo([[a0, 0], [a1, 0], [a1, h1], [a0, h0]], 0.5, R - 0.5, axis), 'concreteD');               // the embankment
+      addMesh(prismGeo([[a0, h0], [a1, h1], [a1, h1 + 0.05], [a0, h0 + 0.05]], 0.5, R - 0.5, axis), 'asphalt');  // the road surface
+      for (const [c0, c1] of [[0, 0.5], [R - 0.5, R]]) { addMesh(prismGeo([[a0, 0], [a1, 0], [a1, h1 + 1], [a0, h0 + 1]], c0, c1, axis), 'concreteD'); box(c0, c1, a0, a1, 0, Math.max(h0, h1) + 1); }
+      const hiA = h0 > h1 ? a0 : a1 - 0.5; box(0, R, hiA, hiA + 0.5, 0, FLY_H - 1);                                // the tall end, against the junction
+    } else {
+      holes.push(axis === 'z' ? [0.5, a0, R - 0.5, a1] : [a0, 0.5, a1, R - 0.5]);
+      addMesh(prismGeo([[a0, h0 - 0.5], [a1, h1 - 0.5], [a1, h1], [a0, h0]], 0.5, R - 0.5, axis), 'asphalt');
+      for (const [c0, c1] of [[0, 0.5], [R - 0.5, R]]) { addMesh(prismGeo([[a0, h0 - 0.6], [a1, h1 - 0.6], [a1, 1], [a0, 1]], c0, c1, axis), 'concreteD'); box(c0, c1, a0, a1, -DIP_D - 0.6, 1); }
+    }
+  };
+  const junctionPart = (axis, kind) => {                // the deck or tunnel across this block's own junction
+    const bx = (along, h, across, a, y, c, key) => axis === 'z' ? addBox(bk, key, key, across, h, along, c, y, a) : addBox(bk, key, key, along, h, across, a, y, c);
+    const box = (c0, c1, b0, b1, y0, y1) => solids.push(axis === 'z' ? { x0: c0, x1: c1, z0: b0, z1: b1, y0, y1 } : { x0: b0, x1: b1, z0: c0, z1: c1, y0, y1 });
+    const yTop = kind === 'fly' ? FLY_H : -DIP_D;
+    surfaces.push(axis === 'z' ? { axis, x0: 0.5, x1: R - 0.5, z0: 0, z1: R, h0: yTop, h1: yTop } : { axis, x0: 0, x1: R, z0: 0.5, z1: R - 0.5, h0: yTop, h1: yTop });   // full length: no gap to the ramps
+    if (kind === 'fly') {
+      bx(R, 0.8, R - 1, R / 2, FLY_H - 0.4, R / 2, 'concrete'); bx(R, 0.05, R - 1, R / 2, FLY_H + 0.02, R / 2, 'roof');
+      for (const c of [0.25, R - 0.25]) { bx(R, 1, 0.5, R / 2, FLY_H + 0.5, c, 'concrete'); box(c - 0.25, c + 0.25, 0, R, FLY_H, FLY_H + 1); }
+      box(0, R, 0, R, FLY_H - 0.8, FLY_H);
+    } else {
+      bx(R, 0.5, R, R / 2, -DIP_D - 0.25, R / 2, 'roof'); bx(R, 0.5, R, R / 2, -0.3, R / 2, 'concrete');          // floor and ceiling
+      for (const c of [0.25, R - 0.25]) { bx(R, DIP_D, 0.5, R / 2, -DIP_D / 2, c, 'concrete'); box(c - 0.25, c + 0.25, 0, R, -DIP_D, -0.05); }
+      for (const c of [R * 0.3, R * 0.7]) bx(R - 2, 0.05, 0.25, R / 2, -0.6, c, 'fluo');
+      const [fx, fz] = axis === 'z' ? [R / 2, R / 2] : [R / 2, R / 2]; addFlat(bk, 'glowf', fx, fz, 18, -DIP_D + 0.04);
+    }
+  };
+  if (zf0) { junctionPart('z', zf0); roadRamp('z', zf0, R, R + RAMP_L, zf0 === 'fly' ? FLY_H : -DIP_D, 0); }
+  if (zf1) roadRamp('z', zf1, C - RAMP_L, C, 0, zf1 === 'fly' ? FLY_H : -DIP_D);
+  if (xf0) { junctionPart('x', xf0); roadRamp('x', xf0, R, R + RAMP_L, xf0 === 'fly' ? FLY_H : -DIP_D, 0); }
+  if (xf1) roadRamp('x', xf1, C - RAMP_L, C, 0, xf1 === 'fly' ? FLY_H : -DIP_D);
+
   // P9: the low metro line runs right over this block's x-road on columns down the median
   if (metroOnX(j)) {
     const y = 9.5, zc = R / 2;
@@ -864,7 +1734,7 @@ function genCell(i, j) {
     for (const z of [R + 10, R + 35, R + 60]) { addBox(bk, 'concrete', 'concrete', 1.6, y - 0.7, 1.6, xc, (y - 0.7) / 2, z); solids.push({ x0: xc - 0.8, x1: xc + 0.8, z0: z - 0.8, z1: z + 0.8, y0: 0, y1: y - 0.7 }); }
   }
   // An underpass: a building straddles the z-road for most of the block; you drive through under strip lights
-  if (!isGas && !metroOnZ(i) && (zone === 'corridor' || zone === 'residential' || zone === 'corner') && rnd() < 0.12) {
+  if (!isGas && !metroOnZ(i) && !zf0 && !zf1 && (zone === 'corridor' || zone === 'residential' || zone === 'corner') && rnd() < 0.12) {
     const z0 = R + 6, z1 = C - 6, zl = z1 - z0, zm = (z0 + z1) / 2, bh = 12 + rnd() * 20, x0 = -SW - 1, x1 = R + SW + 1, xw = x1 - x0, xm = (x0 + x1) / 2;
     addBox(bk, win(), 'roof', xw, bh, zl, xm, 9 + bh / 2, zm, rnd);
     solids.push({ x0, x1, z0, z1, y0: 9, y1: 9 + bh });
@@ -873,7 +1743,7 @@ function genCell(i, j) {
     for (let z = z0 + 6; z < z1 - 4; z += 12) addFlat(bk, 'glowf', R / 2, z, 14, 0.06);
   }
   // A footbridge over the x-road: lit, glazed, empty (P11)
-  if (!isGas && !metroOnX(j) && (zone === 'residential' || zone === 'corridor') && rnd() < 0.15) {
+  if (!isGas && !metroOnX(j) && !xf0 && !xf1 && (zone === 'residential' || zone === 'corridor') && rnd() < 0.15) {
     const xb = R + 20 + rnd() * 3, y = 6.8, z0 = -SW - 2, z1 = R + SW + 2, zl = z1 - z0, zm = (z0 + z1) / 2;
     addBox(bk, 'concrete', 'roof', 3.4, 0.4, zl, xb, y, zm);
     addBox(bk, 'bridge', 'roof', 3, 2.6, zl, xb, y + 1.5, zm);
@@ -901,8 +1771,9 @@ function genCell(i, j) {
     addBox(bk, on ? lk : 'pole', on ? lk : 'pole', dx ? 1.4 : 0.5, 0.22, dz ? 1.4 : 0.5, x + dx * 2.2, 7.35, z + dz * 2.2);
     if (on) addFlat(bk, gk, x + dx * 4, z + dz * 4, 22, 0.05);
   };
-  for (const q of [R + 10, R + 36, R + 62]) { lamp(R + 0.8, q, -1, 0); lamp(q, R + 0.8, 0, -1); }
-  for (const q of [R + 23, R + 49]) { lamp(-0.8, q, 1, 0); lamp(q, -0.8, 0, 1); }   // the far side of each road, staggered
+  const zLampOK = q => !((zf0 && q < R + RAMP_L + 3) || (zf1 && q > C - RAMP_L - 3)), xLampOK = q => !((xf0 && q < R + RAMP_L + 3) || (xf1 && q > C - RAMP_L - 3));
+  for (const q of [R + 10, R + 36, R + 62]) { if (zLampOK(q)) lamp(R + 0.8, q, -1, 0); if (xLampOK(q)) lamp(q, R + 0.8, 0, -1); }
+  for (const q of [R + 23, R + 49]) { if (zLampOK(q)) lamp(-0.8, q, 1, 0); if (xLampOK(q)) lamp(q, -0.8, 0, 1); }   // the far side of each road, staggered
 
   if (mom) momentPos = buildMoment(mom, { i, j, bk, grp, rnd, ph, mid, facades, extras, ticks, solo, solids }) || momentPos;
   for (const f of facades) solids.push({ x0: f.x0, x1: f.x1, z0: f.z0, z1: f.z1, y0: f.y0 <= ph + 0.5 ? 0 : f.y0, y1: f.y1 });
@@ -910,7 +1781,7 @@ function genCell(i, j) {
 
   flush(bk, grp, geos);
   scene.add(grp);
-  return { grp, geos, signMats, flick, zone, extras, momentPos, solids, tick: ticks.length ? (dt, t) => ticks.forEach(f => f(dt, t)) : null };
+  return { grp, geos, signMats, flick, zone, extras, momentPos, solids, surfaces, holes, tick: ticks.length ? (dt, t) => ticks.forEach(f => f(dt, t)) : null };
 }
 function disposeCell(c) {
   scene.remove(c.grp); c.geos.forEach(g => g.dispose()); c.signMats.forEach(m => m.dispose()); c.extras.forEach(x => x.dispose());
@@ -1179,10 +2050,18 @@ function groundMaterial() {
   return new THREE.MeshStandardMaterial({ map: tm, emissiveMap: te, emissive: 0xffffff, emissiveIntensity: 0.55, roughness: 0.55, metalness: 0.15 });
 }
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(C * 24, C * 24), groundMaterial());
+// Openings in the street (ramps down to tunnels and car parks): the ground shader discards fragments inside them
+const HOLE_N = 16, holeUniform = { value: Array.from({ length: HOLE_N }, () => new THREE.Vector4(1e9, 1e9, 1e9, 1e9)) };
+ground.material.onBeforeCompile = sh => {
+  sh.uniforms.uHoles = holeUniform;
+  sh.vertexShader = 'varying vec2 vWXZ;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWXZ = (modelMatrix * vec4(transformed, 1.0)).xz;');
+  sh.fragmentShader = 'uniform vec4 uHoles[16];\nvarying vec2 vWXZ;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>',
+    '#include <clipping_planes_fragment>\n  for (int k = 0; k < 16; k++) { vec4 h = uHoles[k]; if (vWXZ.x > h.x && vWXZ.x < h.z && vWXZ.y > h.y && vWXZ.y < h.w) discard; }');
+};
 ground.rotation.x = -Math.PI / 2; scene.add(ground);
 
 /* ---------- car ---------- */
-const car = { alt: 0, vy: 0, boost: 1, boosting: 0, pos: new THREE.Vector3(C + R / 2 + 3, 0, (DS - 1) * C + 40), heading: 0, speed: 0, vel: new THREE.Vector3(), steer: 0, bump: 0, drift: 0 };
+const car = { y: 0, vyG: 0, slope: 0, riding: null, alt: 0, vy: 0, boost: 1, boosting: 0, pos: new THREE.Vector3(C + R / 2 + 3, 0, (DS - 1) * C + 40), heading: 0, speed: 0, vel: new THREE.Vector3(), steer: 0, bump: 0, drift: 0 };
 const carMesh = new THREE.Group(); scene.add(carMesh);
 const frontWheels = [], flames = [], wheelRings = [];
 let boostLight = null;
@@ -1362,6 +2241,53 @@ const trails = [
   makeTrail('ship', new THREE.Vector3(-1.8, 0.2, 0.9), PALE, EMBER, 0.07),
 ];
 const trailOwner = { car: carMesh, board: boardMesh, ship: shipMesh };
+
+/* ---------- spaceship designs ---------- */
+// shipMesh is the pose (position, banking, bobbing). Each design is a child group inside it; only one is shown.
+// Designs from ships/codex-ships.js and ships/agy-ships.js are built exactly as written, through this kit.
+const shipKit = {
+  mats: {
+    enamel: new THREE.MeshStandardMaterial({ color: 0xbdb8ab, metalness: 0.2, roughness: 0.45, emissive: 0x0c0b09, emissiveIntensity: 0.5 }),
+    dirty: new THREE.MeshStandardMaterial({ color: 0x9a958a, metalness: 0.15, roughness: 0.6, emissive: 0x0a0907, emissiveIntensity: 0.5 }),
+    graphite: new THREE.MeshStandardMaterial({ color: 0x2c2d31, metalness: 0.5, roughness: 0.45 }),
+    grey: new THREE.MeshStandardMaterial({ color: 0x55575b, metalness: 0.4, roughness: 0.5 }),
+    concrete: new THREE.MeshStandardMaterial({ color: 0x6a6866, roughness: 0.9 }),
+    glass: new THREE.MeshStandardMaterial({ color: 0x0a0806, metalness: 0.4, roughness: 0.05, emissive: 0x4a2a10, emissiveIntensity: 1.0 }),
+    red: new THREE.MeshBasicMaterial({ color: 0x8e2a21 }),
+    headlamp: new THREE.MeshBasicMaterial({ color: 0xfff1d6 }),
+  },
+  amber: () => new THREE.MeshBasicMaterial({ color: 0xff9a40 }),
+  glowSprite: () => new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xff9a40, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })),
+  groundGlow: (w, dd) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, dd), glowMat(0xff9a40, 0.4)); m.rotation.x = -Math.PI / 2; m.renderOrder = 1; return m; },
+};
+const shipDesigns = [];
+{ // the original ship becomes design 0: move its parts into their own group
+  const g = new THREE.Group(); while (shipMesh.children.length) g.add(shipMesh.children[0]); shipMesh.add(g);
+  shipDesigns.push({ name: 'Lastochka', author: 'claude', group: g, engines: ship.ports, engineGlows: ship.portGlows, underRing: ship.ring, groundGlow: ship.glow, underLight: ship.under,
+    trailPoints: [new THREE.Vector3(1.8, 0.2, 0.9), new THREE.Vector3(-1.8, 0.2, 0.9)] });
+}
+{ const keyL = new THREE.PointLight(0xd8c8ff, 0.5, 12, 1.5); keyL.position.set(0, 4, 4); shipMesh.add(keyL); }   // a soft key light for every design
+for (const design of [...(window.SHIP_DESIGNS_CODEX || []), ...(window.SHIP_DESIGNS_AGY || [])]) {
+  try {
+    const parts = design.build(THREE, shipKit);
+    parts.group.visible = false; shipMesh.add(parts.group);
+    shipDesigns.push(Object.assign({ name: design.name, author: design.author }, parts));
+  } catch (e) { console.error('Concrete Nocturne: ship design failed to build:', design && design.name, e); }
+}
+let shipIdx = 0;
+function applyShip(k) {
+  shipIdx = (k + shipDesigns.length) % shipDesigns.length;
+  shipDesigns.forEach((dd, n) => { dd.group.visible = n === shipIdx; });
+  const dd = shipDesigns[shipIdx];
+  ship.ports = dd.engines || []; ship.portGlows = dd.engineGlows || []; ship.ring = dd.underRing || null; ship.glow = dd.groundGlow || null; ship.under = dd.underLight || null;
+  trails.filter(t => t.owner === 'ship').forEach((t, n) => { t.local.copy(dd.trailPoints[n]); t.pts.length = 0; });
+  vehicleLabel();
+}
+function vehicleLabel() {
+  const dd = shipDesigns[shipIdx], by = { claude: '', codex: ' (Codex)', agy: ' (AGY)' }[dd.author] || '';
+  const name = vehicle === 'ship' ? `spaceship · ${dd.name}${by}` : { car: 'car', board: 'hoverboard' }[vehicle];
+  if (typeof $ === 'function' && $('bVeh')) { $('bVeh').innerHTML = `Vehicle: ${name}<kbd>V</kbd>`; $('bVeh').classList.toggle('on', vehicle !== 'car'); }
+}
 function updateTrails() {
   for (const t of trails) {
     const active = t.owner === vehicle; t.mesh.visible = active;
@@ -1848,7 +2774,7 @@ addEventListener('keydown', e => {
   if (paused) return;
   if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); }
   if (e.repeat) return;
-  if (e.code === 'KeyM') toggleMusic(); else if (e.code === 'KeyR') toggleRain(); else if (e.code === 'KeyC') cycleCam(); else if (e.code === 'KeyV') toggleVehicle(); else if (e.code === 'KeyT') setDay(!dayMode);
+  if (e.code === 'KeyM') toggleMusic(); else if (e.code === 'KeyR') toggleRain(); else if (e.code === 'KeyC') cycleCam(); else if (e.code === 'KeyV') toggleVehicle(); else if (e.code === 'KeyT') setDay(!dayMode); else if (e.code === 'KeyB') { if (vehicle !== 'ship') { vehicle = 'board'; toggleVehicle(); } else applyShip(shipIdx + 1); }
   else if (e.code === 'KeyH') document.body.classList.toggle('hide-hud');
   else if ((e.code === 'Enter') && !started) start();
 });
@@ -1896,9 +2822,10 @@ let camMode = 0;
 function cycleCam() { camMode = (camMode + 1) % CAMS.length; $('bCam').innerHTML = `Camera: ${CAMS[camMode]}<kbd>C</kbd>`; $('bCam').classList.toggle('on', camMode !== 0); }
 function toggleVehicle() {
   vehicle = { car: 'board', board: 'ship', ship: 'car' }[vehicle];
-  car.alt = 0; car.vy = 0;                                    // only the spaceship leaves the ground
+  car.alt = 0; car.vy = 0; car.riding = null;                 // only the spaceship leaves the ground
+  if (vehicle === 'ship') car.y = 0;
   if (vehicle === 'car') { car.gear = 1; car.rpm = IDLE; }
-  $('bVeh').innerHTML = `Vehicle: ${{ car: 'car', board: 'hoverboard', ship: 'spaceship' }[vehicle]}<kbd>V</kbd>`; $('bVeh').classList.toggle('on', vehicle !== 'car');
+  vehicleLabel();
 }
 $('bVeh').onclick = toggleVehicle;
 $('bMusic').onclick = toggleMusic; $('bRain').onclick = toggleRain; $('bCam').onclick = cycleCam;
@@ -1925,6 +2852,7 @@ function setPaused(p) {
   if (p) drawBigMap();
 }
 $('bPause').onclick = () => setPaused(true);
+applyShip(0);
 $('bTime').onclick = () => setDay(!dayMode);
 LOOKC.hor.setHex(LOOKS.night.hor); LOOKC.mid.setHex(LOOKS.night.mid); Object.assign(LOOKC, { fogD: 1, hemi: 0.7, sunI: 0.35, bloomS: 0.95 });
 $('resume').onclick = () => setPaused(false);
@@ -1956,6 +2884,45 @@ function pumpCells(n) {
     const [i, j] = queue.shift(), k = i + ',' + j;
     if (!cells.has(k)) cells.set(k, genCell(i, j));
   }
+}
+
+/* ---------- ground height ---------- */
+// The street is y = 0 except where a block says otherwise: ramps, bridge decks, tunnel and car-park floors.
+// You stay on the highest surface you can reach from where you are, so you pass under decks and drive up ramps.
+function groundAt(x, z, cy) {
+  const ci = Math.floor(x / C), cj = Math.floor(z / C); let best = -1e9, hole = false;
+  for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) {
+    const c = cells.get(i + ',' + j); if (!c || !c.surfaces) continue;
+    const lx = x - i * C, lz = z - j * C;
+    for (const h of c.holes) if (lx > h[0] && lx < h[2] && lz > h[1] && lz < h[3]) hole = true;
+    for (const sf of c.surfaces) {
+      if (lx < sf.x0 || lx > sf.x1 || lz < sf.z0 || lz > sf.z1) continue;
+      const t = sf.axis === 'x' ? (lx - sf.x0) / (sf.x1 - sf.x0) : (lz - sf.z0) / (sf.z1 - sf.z0), y = sf.h0 + (sf.h1 - sf.h0) * t;
+      if (y <= cy + 1.3 && y > best) best = y;
+    }
+  }
+  if (!hole && 0 <= cy + 1.3 && 0 > best) best = 0;
+  return best;
+}
+function followGround(dt) {
+  const gy = groundAt(car.pos.x, car.pos.z, car.y);
+  if (gy > -1e8 && gy >= car.y - 0.6) { car.y = gy; car.vyG = 0; }                 // on it, up a slope or gently down one
+  else {                                                                              // off an edge: fall
+    car.vyG -= 30 * dt; car.y += car.vyG * dt;
+    if (gy > -1e8 && car.y <= gy) { car.y = gy; car.vyG = 0; if (car.speed > 8) { car.heaveV -= 1.2; radio.thump(0.4); } }
+    if (car.y < -60) { car.y = 0; car.vyG = 0; }
+  }
+  const fx = -Math.sin(car.heading) * 2, fz = -Math.cos(car.heading) * 2;
+  const ah = groundAt(car.pos.x + fx, car.pos.z + fz, car.y), bh = groundAt(car.pos.x - fx, car.pos.z - fz, car.y);
+  car.slope = ah > -1e8 && bh > -1e8 ? Math.atan2(ah - bh, 4) : 0;                    // nose up on the way up
+}
+function refreshHoles() {
+  const ci = Math.floor(car.pos.x / C), cj = Math.floor(car.pos.z / C); let n = 0;
+  for (let i = ci - 2; i <= ci + 2; i++) for (let j = cj - 2; j <= cj + 2; j++) {
+    const c = cells.get(i + ',' + j); if (!c || !c.holes) continue;
+    for (const h of c.holes) if (n < HOLE_N) holeUniform.value[n++].set(i * C + h[0], j * C + h[1], i * C + h[2], j * C + h[3]);
+  }
+  for (; n < HOLE_N; n++) holeUniform.value[n].set(1e9, 1e9, 1e9, 1e9);
 }
 
 /* ---------- physics ---------- */
@@ -2000,7 +2967,7 @@ function drive(dt) {
       car.alt = clamp(car.alt + car.vy * dt, 0, 420);
       if ((car.alt === 0 && car.vy < 0) || (car.alt === 420 && car.vy > 0)) car.vy = 0;
       collideAir();
-    } else collide();
+    } else { collide(); followGround(dt); }
     return;
   }
   if (typeof car.gear !== 'number') car.gear = 1;
@@ -2052,6 +3019,7 @@ function drive(dt) {
   car.accel += ((car.speed - prevSpeed) / Math.max(dt, 1e-4) - car.accel) * Math.min(1, dt * 8);
   car.yaw = (car.heading - prevHeading) / Math.max(dt, 1e-4);
   collide();
+  followGround(dt);
 }
 function spring(val, vel, target, k, damp, dt) {
   const acc = (target - val) * k - vel * damp; vel += acc * dt; return [val + vel * dt, vel];
@@ -2063,6 +3031,18 @@ function suspension(dt) {
 }
 // Flying: the towers, bridges, decks and monuments are solid. Walls push you away; come down on a roof and you land on it.
 function collideAir() {
+  // trains: come down on a roof and it carries you; hit its side and it pushes you away
+  { const r = 2.1, y = car.alt + 1.35; car.riding = null;
+    for (const t of metro.trains) {
+      const head = t.along + t.dir * 9, tail = t.along - t.dir * (t.len - 9), a0 = Math.min(head, tail), a1 = Math.max(head, tail), top = t.y + 3.4;
+      const along = t.alongX ? car.pos.x : car.pos.z, cross = t.alongX ? car.pos.z : car.pos.x;
+      if (along < a0 - r || along > a1 + r || Math.abs(cross - t.cross) > 1.5 + r || y < t.y - 1 || y > top + 1.8) continue;
+      if (y >= top + 0.4 && car.vy <= 0.5) { if (y < top + 1.2) car.alt = top + 1.2 - 1.35; if (car.vy < 0) car.vy = 0; car.riding = t; continue; }
+      const edge = cross < t.cross ? t.cross - 1.5 - r : t.cross + 1.5 + r;
+      if (t.alongX) car.pos.z = edge; else car.pos.x = edge;
+      car.bump = Math.max(car.bump, 0.4); radio.thump(0.4);
+    }
+  }
   const r = 2.1, y = car.alt + 1.35, M = 12;
   const i0 = Math.floor((car.pos.x - r - M) / C), i1 = Math.floor((car.pos.x + r + M) / C), j0 = Math.floor((car.pos.z - r - M) / C), j1 = Math.floor((car.pos.z + r + M) / C);
   for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
@@ -2093,7 +3073,7 @@ function collide() {
   for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
     const c = cells.get(i + ',' + j); if (!c || !c.solids) continue;
     for (const b of c.solids) {
-      if (b.y0 > 1.5 || b.y1 < 0.6) continue;
+      if (b.y0 > car.y + 1.5 || b.y1 < car.y + 0.6) continue;
       const x0 = i * C + b.x0 - r, x1 = i * C + b.x1 + r, z0 = j * C + b.z0 - r, z1 = j * C + b.z1 + r;
       if (car.pos.x <= x0 || car.pos.x >= x1 || car.pos.z <= z0 || car.pos.z >= z1) continue;
       const pens = [car.pos.x - x0, x1 - car.pos.x, car.pos.z - z0, z1 - car.pos.z];
@@ -2123,13 +3103,13 @@ function updateCamera(dt, t) {
     look.set(car.pos.x, 3.2, car.pos.z); camera.lookAt(look); return;
   }
   if (camMode === 2) {
-    camera.position.copy(car.pos).addScaledVector(fwd, -0.2); camera.position.y = vehicle === 'board' ? boardMesh.position.y + 1.9 : vehicle === 'ship' ? shipMesh.position.y + 0.55 : 1.2;
-    look.copy(car.pos).addScaledVector(fwd, 30); look.y = 1.2; camera.lookAt(look);
+    camera.position.copy(car.pos).addScaledVector(fwd, -0.2); camera.position.y = vehicle === 'board' ? boardMesh.position.y + 1.9 : vehicle === 'ship' ? shipMesh.position.y + 0.55 : 1.2 + car.y;
+    look.copy(car.pos).addScaledVector(fwd, 30); look.y = 1.2 + (vehicle === 'ship' ? car.alt : car.y); camera.lookAt(look);
   } else {
     const dist = camMode === 0 ? ({ board: 7.5, ship: 9 }[vehicle] || 9) : 22, h = camMode === 0 ? ({ board: 3.2, ship: 3.9 }[vehicle] || 3.2) : 11;
-    camWant.copy(car.pos).addScaledVector(fwd, -dist); camWant.y = h + car.alt;
+    camWant.copy(car.pos).addScaledVector(fwd, -dist); camWant.y = h + car.alt + (vehicle === 'ship' ? 0 : car.y);
     camera.position.lerp(camWant, 1 - Math.exp(-((camMode === 0 ? 4.5 : 1.8) + Math.abs(car.speed) * 0.06) * dt));
-    camTarget.copy(car.pos).addScaledVector(fwd, camMode === 0 ? 6 : 2); camTarget.y = (camMode === 0 ? 1.4 : 3) + car.alt;
+    camTarget.copy(car.pos).addScaledVector(fwd, camMode === 0 ? 6 : 2); camTarget.y = (camMode === 0 ? 1.4 : 3) + car.alt + (vehicle === 'ship' ? 0 : car.y);
     look.lerp(camTarget, 1 - Math.exp(-8 * dt)); camera.lookAt(look);
   }
   if (car.bump > 0) {
@@ -2149,7 +3129,7 @@ function updateHud(elapsed) {
     const label = st || 'Music';
     if ($('bMusic').dataset.label !== label) { $('bMusic').dataset.label = label; $('bMusic').innerHTML = `${label}<kbd>M</kbd>`; }
   }
-  $('gear').textContent = vehicle === 'board' ? 'HOVER' : vehicle === 'ship' ? (car.alt > 3 ? 'ALT ' + Math.round(car.alt) + ' m' : 'FLIGHT') : car.speed < -0.5 ? 'R' : car.gear;
+  $('gear').textContent = vehicle === 'board' ? 'HOVER' : vehicle === 'ship' ? (car.riding ? 'ON TRAIN' : car.alt > 3 ? 'ALT ' + Math.round(car.alt) + ' m' : 'FLIGHT') : car.speed < -0.5 ? 'R' : car.gear;
   $('tachFill').style.transform = `scaleX(${(car.rpm / REDLINE).toFixed(3)})`;
   $('tachFill').parentNode.classList.toggle('red', car.rpm > 6300);
   $('boostFill').style.transform = `scaleX(${car.boost.toFixed(3)})`;
@@ -2170,7 +3150,7 @@ function updateHud(elapsed) {
 /* ---------- the chase ---------- */
 // Now and then a lone car's tail lights appear ahead and it drives off through the city, turning at junctions.
 // It waits if you fall back and runs if you close in. Stay on it and it pulls over: lights out, nobody inside.
-const quarry = { q: null, next: 35 };
+const quarry = { q: null, next: 20 };
 const quarryPaint = new THREE.MeshStandardMaterial({ color: 0x2b3833, metalness: 0.3, roughness: 0.45, emissive: 0x050706, emissiveIntensity: 0.5 });
 const quarryGlass = new THREE.MeshStandardMaterial({ color: 0x07080a, metalness: 0.5, roughness: 0.08 });
 function buildQuarryMesh() {
@@ -2194,10 +3174,11 @@ function spawnQuarry() {
   const dir = Math.sign(alongX ? (moving ? v.x : -Math.sin(car.heading)) : (moving ? v.z : -Math.cos(car.heading))) || -1;
   const lateral = alongX ? car.pos.z : car.pos.x, k = Math.round((lateral - R / 2) / C);
   const mesh = buildQuarryMesh(); scene.add(mesh.g);
-  const q = { mesh, alongX, dir, k, along: (alongX ? car.pos.x : car.pos.z) + dir * 160, speed: Math.max(14, Math.abs(car.speed)), lane: 7, laneT: 7,
+  const q = { mesh, alongX, dir, k, along: (alongX ? car.pos.x : car.pos.z) + dir * 90, speed: Math.max(14, Math.abs(car.speed)), lane: 7, laneT: 7,
     plan: null, planAt: null, close: 0, state: 'run', t: 0, vis: new THREE.Vector3(), heading: 0 };
   quarryPose(q, true);
   quarry.q = q;
+  caption('Someone else is out tonight.');
 }
 // lane offset to the right of travel; the right side of +x travel is +z, of -z travel is +x
 const rightSign = q => q.alongX ? q.dir : -q.dir;
@@ -2210,6 +3191,7 @@ function quarryPose(q, snap) {
     const kk = 1 - Math.exp(-8 * (1 / 60)); q.vis.x += (x - q.vis.x) * kk; q.vis.z += (z - q.vis.z) * kk;
     let dh = h - q.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); q.heading += dh * Math.min(1, kk * 1.2);
   }
+  const qy = groundAt(q.vis.x, q.vis.z, q.y || 0); q.y = qy > -1e8 ? qy : 0; q.vis.y = q.y;
   q.mesh.g.position.copy(q.vis); q.mesh.g.rotation.y = q.heading;
 }
 function quarryTick(dt) {
@@ -2254,7 +3236,7 @@ function quarryTick(dt) {
   }
   if (q.state === 'gone') {
     scene.remove(q.mesh.g); q.mesh.geos.forEach(x => x.dispose()); q.mesh.red.dispose(); q.mesh.white.dispose(); q.mesh.glowMat.dispose();
-    quarry.next = q.said ? 120 + Math.random() * 80 : 60 + Math.random() * 30; quarry.q = null;
+    quarry.next = q.said ? 90 + Math.random() * 60 : 45 + Math.random() * 25; quarry.q = null;
   }
 }
 let captionTimer = 0;
@@ -2277,6 +3259,7 @@ function metroTick(dt) {
     const t = metro.trains[k], carAlong = t.alongX ? car.pos.x : car.pos.z, carCross = t.alongX ? car.pos.z : car.pos.x;
     t.along += t.dir * t.speed * dt;
     if (t.alongX) t.g.position.x = t.along; else t.g.position.z = t.along;
+    if (car.riding === t && vehicle === 'ship') { const d = t.dir * t.speed * dt; if (t.alongX) car.pos.x += d; else car.pos.z += d; }   // carried along on its roof
     const d = Math.hypot(t.along - carAlong, t.cross - carCross);
     if (!t.heard && d < 140) { t.heard = true; radio.trainPass(Math.max(0.25, 1 - d / 140), panFor(t.alongX ? t.along : t.cross, t.alongX ? t.cross : t.along)); }
     if ((t.along - carAlong) * t.dir > 700 || Math.abs(t.cross - carCross) > 900) { scene.remove(t.g); t.geos.forEach(x => x.dispose()); metro.trains.splice(k, 1); }
@@ -2300,7 +3283,7 @@ function spawnTrain(line) {
   const carAlong = line.alongX ? car.pos.x : car.pos.z, along = carAlong - dir * (380 + Math.random() * 120);
   if (line.alongX) g.position.set(along, 0, line.cross); else g.position.set(line.cross, 0, along);
   scene.add(g);
-  metro.trains.push({ g, geos, alongX: line.alongX, cross: line.cross, along, dir, speed: 21 + Math.random() * 6, heard: false });
+  metro.trains.push({ g, geos, alongX: line.alongX, cross: line.cross, along, dir, speed: 21 + Math.random() * 6, heard: false, y: line.y, len: cars * (cl + 0.8) });
 }
 
 /* ---------- map ---------- */
@@ -2331,7 +3314,7 @@ function drawMap(ctx, w, h, cx, cz, scale, rot) {
   for (let j = j0; j <= j1; j++) if (metroOnX(j)) { ctx.beginPath(); ctx.moveTo(i0 * C, j * C + R / 2); ctx.lineTo((i1 + 1) * C, j * C + R / 2); ctx.stroke(); }
   for (let i = i0; i <= i1; i++) if (metroOnZ(i)) { ctx.beginPath(); ctx.moveTo(i * C + R / 2, j0 * C); ctx.lineTo(i * C + R / 2, (j1 + 1) * C); ctx.stroke(); }
   ctx.fillStyle = '#d98a3a'; const gs = 14 / scale * (w / 300); ctx.fillRect(GAS.i * C + 65 - gs / 2, GAS.j * C + 65 - gs / 2, gs, gs);   // the gas station
-  if (quarry.q && quarry.q.state === 'run') { ctx.fillStyle = '#ff3a2a'; ctx.beginPath(); ctx.arc(quarry.q.vis.x, quarry.q.vis.z, 9 / scale * (w / 300), 0, 7); ctx.fill(); }
+  if (quarry.q && quarry.q.state === 'run') { ctx.fillStyle = '#ff3a2a'; ctx.beginPath(); ctx.arc(quarry.q.vis.x, quarry.q.vis.z, (13 + 5 * Math.sin(elapsed * 6)) / scale * (w / 300), 0, 7); ctx.fill(); }
   if (route.length > 1) {
     ctx.strokeStyle = 'rgba(255,138,58,0.6)'; ctx.lineWidth = 2.2 / scale * (w / 300); ctx.lineJoin = ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(route[0][0], route[0][1]);
@@ -2387,13 +3370,13 @@ function frame() {
   carMesh.position.copy(car.pos);
   if (started) suspension(dt);
   carMesh.visible = vehicle === 'car'; boardMesh.visible = vehicle === 'board'; shipMesh.visible = vehicle === 'ship';
-  carMesh.position.y = car.heave;
+  carMesh.position.y = car.y + car.heave;
   carMesh.rotation.set(0, car.heading, 0);
-  carMesh.rotateX(car.pitch); carMesh.rotateZ(car.roll);
+  carMesh.rotateX(car.pitch + car.slope); carMesh.rotateZ(car.roll);
   if (vehicle === 'board') {
     const hover = 0.55 + Math.sin(elapsed * 2.1) * 0.05 + Math.sin(elapsed * 0.8) * 0.03;
     const carve = clamp(-car.yaw * car.speed * 0.014, -0.6, 0.6);        // deep lean into turns, like a snowboard carve
-    boardMesh.position.set(car.pos.x, hover + car.heave, car.pos.z);
+    boardMesh.position.set(car.pos.x, car.y + hover + car.heave, car.pos.z);
     boardMesh.rotation.set(0, car.heading, 0);
     boardMesh.rotateX(clamp(car.accel * 0.004, -0.08, 0.08));
     boardMesh.rotateZ(carve + Math.sin(elapsed * 1.4) * 0.015);
@@ -2414,12 +3397,12 @@ function frame() {
     shipMesh.rotation.set(0, car.heading, 0);
     shipMesh.rotateX(clamp(-car.accel * 0.005, -0.1, 0.1) + clamp(car.vy * 0.016, -0.32, 0.32) + Math.sin(elapsed * 1.2) * 0.015); // nose up to climb
     shipMesh.rotateZ(clamp(-car.yaw * car.speed * 0.012, -0.6, 0.6) + Math.sin(elapsed * 1.0) * 0.02);
-    ship.glow.visible = car.alt < 6; ship.glow.position.set(0, -hover - car.alt + 0.07, 0); ship.glow.rotation.set(-Math.PI / 2 - shipMesh.rotation.x, 0, 0);
+    if (ship.glow) { ship.glow.visible = car.alt < 6; ship.glow.position.y = -hover - car.alt + 0.07; ship.glow.rotation.set(-Math.PI / 2 - shipMesh.rotation.x, 0, 0); }
     const pulse = 0.75 + 0.25 * Math.sin(elapsed * 4), amt = 0.5 + car.throttle * 0.4 + car.boosting * 0.8, j = 0.9 + Math.random() * 0.2;
     ship.ports.forEach(p => p.material.color.setRGB(1, 0.55 + car.boosting * 0.3, 0.2 + car.boosting * 0.4));
     ship.portGlows.forEach(g => { g.material.opacity = Math.min(1, amt) * j; g.scale.setScalar(0.8 + amt * 1.1 * j); g.material.color.setRGB(1, 0.55 + car.boosting * 0.3, 0.2 + car.boosting * 0.4); });
-    ship.ring.material.color.setRGB(pulse, (0.55 + car.boosting * 0.3) * pulse, (0.2 + car.boosting * 0.4) * pulse);
-    ship.under.intensity = 1.1 + amt * 0.6;
+    if (ship.ring) ship.ring.material.color.setRGB(pulse, (0.55 + car.boosting * 0.3) * pulse, (0.2 + car.boosting * 0.4) * pulse);
+    if (ship.under) ship.under.intensity = 1.1 + amt * 0.6;
   }
   updateTrails();
   const ringPulse = 0.8 + 0.2 * Math.sin(elapsed * 3) + car.boosting * 0.2;
@@ -2475,6 +3458,7 @@ function frame() {
   if (started && vehicle === 'car' && radio.rainOn && elapsed > nextWipe) { nextWipe = elapsed + 1.9; radio.wiper(); }
   updateCamera(dt, elapsed);
   sky.position.copy(camera.position); skyGroup.position.copy(camera.position);
+  rain.visible = radio.rainOn && (vehicle === 'ship' || car.y > -1.5);   // no rain in tunnels and car parks
   if (rain.visible) updateRain(dt);
   if (started) {
     const lx = ((car.pos.x % C) + C) % C, lz = ((car.pos.z % C) + C) % C;
@@ -2493,7 +3477,7 @@ function frame() {
     wasOnStripe = onStripe;
   }
 
-  if ((hudTick += dt) > 0.1) { hudTick = 0; updateHud(elapsed); if (started) mapRecord(); }
+  if ((hudTick += dt) > 0.1) { hudTick = 0; updateHud(elapsed); if (started) mapRecord(); refreshHoles(); }
   drawMiniMap();
   if (composer) { lofiPass.uniforms.time.value = elapsed; composer.render(); } else renderer.render(scene, camera);
 }
