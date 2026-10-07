@@ -1,0 +1,25 @@
+const { chromium } = require('/Users/alisyed/.npm/_npx/86170c4cd1c5da32/node_modules/playwright-core');
+const OUT = process.argv[2] || (__dirname + '/../../Screenshots/latest/'); require('fs').mkdirSync(OUT, { recursive: true });
+(async () => {
+  const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
+  const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
+  const errs = []; p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); }); p.on('pageerror', e => errs.push('PAGEERR ' + e.message));
+  await p.goto('http://localhost:8931/play.html'); await p.waitForTimeout(4000);
+  const shot = async n => { await p.screenshot({ path: OUT + n + '.png' }); console.log('shot', n); };
+  await shot('01_intro');
+  await p.click('#go'); await p.waitForTimeout(2500); await shot('02_start_hud_stationary');
+  await p.keyboard.down('w'); await p.waitForTimeout(6000); await shot('03_driving_6s');
+  await p.keyboard.down('Space'); await p.waitForTimeout(2500); await shot('04_boost'); await p.keyboard.up('Space');
+  await p.keyboard.down('a'); await p.keyboard.down('Shift'); await p.waitForTimeout(1200); await shot('05_drift'); await p.keyboard.up('a'); await p.keyboard.up('Shift');
+  await p.waitForTimeout(12000); await shot('06_driving_20s');
+  await p.keyboard.up('w'); await p.keyboard.press('Escape'); await p.waitForTimeout(1200); await shot('07_pause_map'); await p.keyboard.press('Escape'); await p.waitForTimeout(800);
+  await p.keyboard.press('c'); await p.waitForTimeout(1500); await shot('08_camera2'); await p.keyboard.press('c'); await p.waitForTimeout(1500); await shot('09_camera3'); await p.keyboard.press('c'); await p.waitForTimeout(800);
+  await p.keyboard.press('t'); await p.waitForTimeout(2500); await shot('10_day'); await p.keyboard.down('w'); await p.waitForTimeout(4000); await shot('11_day_driving'); await p.keyboard.up('w'); await p.keyboard.press('t'); await p.waitForTimeout(1500);
+  await p.keyboard.press('v'); await p.waitForTimeout(2000); await shot('12_hoverboard'); await p.keyboard.down('w'); await p.waitForTimeout(3000); await shot('13_hoverboard_moving'); await p.keyboard.up('w');
+  await p.keyboard.press('v'); await p.waitForTimeout(2000); await shot('14_ship'); await p.keyboard.down('q'); await p.keyboard.down('w'); await p.waitForTimeout(4000); await p.keyboard.up('q'); await shot('15_ship_flying'); await p.keyboard.up('w');
+  await p.keyboard.press('b'); await p.waitForTimeout(1500); await shot('16_ship_design2');
+  await p.keyboard.press('h'); await p.waitForTimeout(1200); await shot('17_hud_hidden'); await p.keyboard.press('h');
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(1500); await shot('18_mobile');
+  console.log('ERRORS', JSON.stringify(errs.slice(0, 10)));
+  await b.close();
+})();

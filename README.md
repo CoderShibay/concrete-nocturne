@@ -2,8 +2,8 @@
 
 A night drive through an endless brutalist city that is alive for everyone except you.
 Towers too tall to see the top of, sodium lamps in a blue-black sky, windows going out one by one,
-and a car radio playing cold post-punk to one person. It is not horror and nothing chases you;
-the city is simply not for you.
+and a car radio playing cold post-punk to one person. It is not horror. Now and then a lone car
+runs ahead of you, and when you catch it nobody is inside; the city is simply not for you.
 
 - **Play online:** https://claude.ai/artifact/S4u6tWkfTZSLWjMYihDWFX (private artifact)
 - **Play locally:** run `./build-play.sh`, then open `play.html` in a browser
@@ -107,8 +107,9 @@ about to appear ahead. It only counts once you have passed it; turn away and it 
 ## The car
 
 A white Soviet-era saloon: boxy, chrome bumpers, four round headlamps. Its cabin glows warm, the one
-refuge in the city. The hoverboard and compact spaceship (V) share its look: off-white enamel, grey and
-chrome, a red stripe, and warm amber glow instead of neon.
+refuge in the city. The hoverboard and the original spaceship (V) share its look: off-white enamel, grey and
+chrome, a red stripe, and warm amber glow instead of neon. B cycles through six more ship designs by
+Codex and AGY, each built from the same palette.
 
 ## Files
 
@@ -119,6 +120,10 @@ chrome, a red stripe, and warm amber glow instead of neon.
 | `play.html` | Generated; gitignored. Edit the source and rebuild. |
 | `play-test.html` | Generated test copy that exposes internals as `window.__cn`; gitignored. |
 | `LONELY_CITY_BRIEF.md` | The design brief the city is built from. |
+| `DISTRICT_CONCEPTS.md` | Twelve further district ideas drawn from the research (not built yet). |
+| `ships/SHIP_DESIGN_SPEC.md` | The brief and code contract for the spaceship designs. |
+| `ships/codex-ships.js`, `ships/agy-ships.js` | Three ships each by Codex and AGY, embedded in the game unchanged. |
+| `autotest.html` | Generated headless-test copy; gitignored. |
 
 ## Tech
 
