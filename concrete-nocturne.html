@@ -1353,7 +1353,7 @@ function newtownLot(li, lj) {
 }
 // Field of Blocks: every lot is filled with plain slabs, 8 across and 5 deep, with 5 m lanes both ways. They are
 // knee-high at the lot's edge and rise toward its centre, until the city is gone and you are alone between walls.
-const FIELD = { cols: 8, rows: 5, w: 2.6, l: 6.2, a0: 37.1, da: 7.6, b0: 39.5, db: 11.2, edge: 0.9, rise: 5.4, wall: 8.5 };
+const FIELD = { cols: 8, rows: 5, w: 2.6, l: 6.2, a0: 37.1, da: 7.6, b0: 39.5, db: 11.2, edge: 0.9, rise: 5.4, dip: 2.2, wall: 8.5 };
 const fieldCache = new Map();
 function fieldOf(di, dj) {                                   // one direction and one slow swell for the whole district
   const k = di + ',' + dj; let f = fieldCache.get(k);
@@ -1380,13 +1380,19 @@ function fieldLanes(f, alongZ) {
   for (let k = 0; k < FIELD.rows - 1; k++) rows.push(FIELD.b0 + FIELD.l + 2.5 + k * FIELD.db);
   return alongZ !== f.turn ? cols : rows;
 }
-// 0 on the road, up to 1 between the tallest slabs: how much wall stands beside this point
-function fieldDepth(x, z) {
+// Two surfaces, as at the Berlin field: the slab tops rise gently while the ground sinks under them, so from the road
+// the field looks low and inside it the walls are deep. fieldSink is how far in and how deep a point is, 0 to 1;
+// the ground is a smooth bowl, flat at the lot's edge and at its centre, at most 2.2 m down.
+function fieldSink(x, z) {
   const i = Math.floor(x / C), j = Math.floor(z / C), di = districtOf(i), dj = districtOf(j);
-  if (districtZones.get(di + ',' + dj) !== 'field') return 0;
-  const lx = x - i * C, lz = z - j * C; if (lx < LOT_A || lx > LOT_B || lz < LOT_A || lz > LOT_B) return 0;
-  return (FIELD.edge + FIELD.rise * fieldIn(lx, lz) * fieldSwell(fieldOf(di, dj), i - di * DS, j - dj * DS)) / FIELD.wall;
+  if (districtZones.get(di + ',' + dj) !== 'field') return -1;
+  const lx = x - i * C, lz = z - j * C; if (lx < LOT_A || lx > LOT_B || lz < LOT_A || lz > LOT_B) return -1;
+  return fieldIn(lx, lz) * fieldSwell(fieldOf(di, dj), i - di * DS, j - dj * DS);
 }
+// height of the ground under a point: 0 everywhere except inside a Field of Blocks lot
+function groundAt(x, z) { const k = fieldSink(x, z); return k > 0 ? -FIELD.dip * k : 0; }
+// 0 on the road, up to 1 between the tallest slabs: how much wall stands beside this point
+function fieldDepth(x, z) { const k = fieldSink(x, z); return k < 0 ? 0 : (FIELD.edge + (FIELD.rise + FIELD.dip) * k) / FIELD.wall; }
 function directorTick(dt) {
   director.driveTime += dt;
   director.distanceDriven += Math.abs(car.speed) * dt;
@@ -1584,16 +1590,22 @@ function genCell(i, j) {
     lampOn = 0.15;
   } else if (zone === 'field') {
     // Field of Blocks: no tower, no sign, no lamp inside the lot. The skyline is whatever the neighbours show.
-    plinth(FLAT);
-    const f = fieldOf(di, dj), w = fieldSwell(f, li, lj);
+    ph = FLAT;
+    const f = fieldOf(di, dj), w = fieldSwell(f, li, lj), gnd = (x, z) => -FIELD.dip * fieldIn(x, z) * w;
+    { // the lot's paving, sunk into a bowl; the flat ground plane is cut away under it (see HOLES)
+      const pg = new THREE.PlaneGeometry(LOT_B - LOT_A, LOT_B - LOT_A, 16, 16); pg.rotateX(-Math.PI / 2); pg.translate((LOT_A + LOT_B) / 2, 0, (LOT_A + LOT_B) / 2);
+      const P = pg.attributes.position; for (let k = 0; k < P.count; k++) P.setY(k, ph + gnd(P.getX(k), P.getZ(k)));
+      pg.computeVertexNormals(); grp.add(new THREE.Mesh(pg, mats.roof)); extras.push(pg);
+    }
     for (let c = 0; c < FIELD.cols; c++) for (let r = 0; r < FIELD.rows; r++) {
       const a = FIELD.a0 + c * FIELD.da, b = FIELD.b0 + r * FIELD.db;
       const x0 = f.turn ? b : a, z0 = f.turn ? a : b, x1 = x0 + (f.turn ? FIELD.l : FIELD.w), z1 = z0 + (f.turn ? FIELD.w : FIELD.l);
-      const top = Math.max(FIELD.edge, FIELD.edge + FIELD.rise * fieldIn((x0 + x1) / 2, (z0 + z1) / 2) * w + (rnd() - 0.5) * 0.5);
+      const top = Math.max(FIELD.edge, FIELD.edge + FIELD.rise * fieldIn((x0 + x1) / 2, (z0 + z1) / 2) * w + (rnd() - 0.5) * 0.5);   // above road level
+      const base = Math.min(gnd(x0, z0), gnd(x1, z0), gnd(x0, z1), gnd(x1, z1));                                                  // it stands on the sunken ground
       // about three slabs in ten stay upright; the rest lean a little. The collision box stays upright.
       const [tx, tz] = rnd() < 0.3 ? [0, 0] : fieldLean(f, (li * C + x0 + x1) / 2, (lj * C + z0 + z1) / 2);
-      addSlab(bk, 'stele', x0, x1, z0, z1, ph, top, tx * (top - ph), tz * (top - ph));
-      solids.push({ x0, x1, z0, z1, y0: 0, y1: top });
+      addSlab(bk, 'stele', x0, x1, z0, z1, base, top, tx * (top - base), tz * (top - base));
+      solids.push({ x0, x1, z0, z1, y0: base, y1: top });
     }
     lampOn = 0.5; sodium = true;
   } else if (zone === 'interchange') {
@@ -1976,7 +1988,7 @@ function makePacer(alongZ, s) {
   const b = new THREE.Mesh(bg, body); b.position.y = 0.6; g.add(b);
   const pg = new THREE.PlaneGeometry(6, 13), pm = glowMat(0xfff1d6, 0.5), pool = new THREE.Mesh(pg, pm);   // its light on the ground ahead of it
   pool.rotation.x = -Math.PI / 2; pool.position.set(0, 0.1, -8.5); pool.renderOrder = 1; g.add(pool);
-  g.rotation.y = alongZ ? (s > 0 ? Math.PI : 0) : (s > 0 ? -Math.PI / 2 : Math.PI / 2); g.visible = false; scene.add(g);
+  g.rotation.order = 'YXZ'; g.rotation.y = alongZ ? (s > 0 ? Math.PI : 0) : (s > 0 ? -Math.PI / 2 : Math.PI / 2); g.visible = false; scene.add(g);
   const isField = (x, z) => districtZones.get(districtOf(Math.floor(x / C)) + ',' + districtOf(Math.floor(z / C))) === 'field';
   const POSTS = [40, 53, 66, 79, 92];                                           // lanes that run into a lamp post at the kerb
   let state = 'wait', age = 0, run = 0, still = 0, sp = 0, cross = 0, along = 0; const runFor = 5 + Math.random() * 2;
@@ -2010,7 +2022,9 @@ function makePacer(alongZ, s) {
       }
       along += s * sp * dt;
       if (alongZ) pos.set(cross, 0, along); else pos.set(along, 0, cross);
-      g.position.copy(pos);
+      const dx = alongZ ? 0 : s * 2, dz = alongZ ? s * 2 : 0;                    // it follows the ground down, as you do
+      pos.y = groundAt(pos.x, pos.z); g.position.copy(pos);
+      g.rotation.x = Math.atan((groundAt(pos.x + dx, pos.z + dz) - groundAt(pos.x - dx, pos.z - dz)) / 4);
     },
     dispose() { scene.remove(g); white.dispose(); body.dispose(); halo.dispose(); lg.dispose(); bg.dispose(); pg.dispose(); pm.dispose(); },
   };
@@ -2107,6 +2121,20 @@ function momentsTick(dt, t) {
 }
 
 /* ---------- ground ---------- */
+// The world ground is one flat plane that follows the car. Where a Field of Blocks lot sinks below it, the plane is
+// cut away: one texel per block around the car says "this lot is a bowl", and the lot's own paving is drawn instead.
+const HOLES = { n: 32, data: new Uint8Array(32 * 32), tex: { value: null }, origin: { value: new THREE.Vector2() }, dirty: true };
+HOLES.tex.value = new THREE.DataTexture(HOLES.data, HOLES.n, HOLES.n, THREE.LuminanceFormat);
+function updateHoles() {
+  HOLES.dirty = false; HOLES.data.fill(0);
+  const oi = (lastCi || 0) - HOLES.n / 2, oj = (lastCj || 0) - HOLES.n / 2; HOLES.origin.value.set(oi, oj);
+  for (const [k, c] of cells) {
+    if (c.zone !== 'field') continue;
+    const [i, j] = k.split(',').map(Number), ti = i - oi, tj = j - oj;
+    if (ti >= 0 && tj >= 0 && ti < HOLES.n && tj < HOLES.n) HOLES.data[tj * HOLES.n + ti] = 255;
+  }
+  HOLES.tex.value.needsUpdate = true;
+}
 function groundMaterial() {
   const S = 1024, u = S / C, rp = R * u;
   const m = mkCanvas(S, S), e = mkCanvas(S, S), a = m.getContext('2d'), b = e.getContext('2d');
@@ -2129,7 +2157,15 @@ function groundMaterial() {
   });
   const tm = new THREE.CanvasTexture(m), te = new THREE.CanvasTexture(e);
   for (const t of [tm, te]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(24, 24); t.anisotropy = aniso; }
-  return new THREE.MeshStandardMaterial({ map: tm, emissiveMap: te, emissive: 0xffffff, emissiveIntensity: 0.55, roughness: 0.55, metalness: 0.15 });
+  const mat = new THREE.MeshStandardMaterial({ map: tm, emissiveMap: te, emissive: 0xffffff, emissiveIntensity: 0.55, roughness: 0.55, metalness: 0.15 });
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.tHole = HOLES.tex; sh.uniforms.uHoleO = HOLES.origin;
+    sh.vertexShader = 'varying vec3 vGW;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vGW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'uniform sampler2D tHole;\nuniform vec2 uHoleO;\nvarying vec3 vGW;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+      vec2 gCell = floor(vGW.xz / ${C}.0), gLoc = vGW.xz - gCell * ${C}.0;
+      if (gLoc.x > ${LOT_A}.3 && gLoc.x < ${LOT_B - 1}.7 && gLoc.y > ${LOT_A}.3 && gLoc.y < ${LOT_B - 1}.7 && texture2D(tHole, (gCell - uHoleO + 0.5) / ${HOLES.n}.0).r > 0.5) discard;`);
+  };
+  return mat;
 }
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(C * 24, C * 24), groundMaterial());
 ground.rotation.x = -Math.PI / 2; scene.add(ground);
@@ -2958,6 +2994,7 @@ function updateCells() {
     const [i, j] = k.split(',').map(Number);
     if (Math.abs(i - ci) > VIEW || Math.abs(j - cj) > VIEW) { disposeCell(c); cells.delete(k); }
   }
+  HOLES.dirty = true;
   queue.length = 0;
   for (let di = -VIEW; di <= VIEW; di++) for (let dj = -VIEW; dj <= VIEW; dj++) {
     if (!cells.has((ci + di) + ',' + (cj + dj))) queue.push([ci + di, cj + dj, di * di + dj * dj]);
@@ -2969,8 +3006,9 @@ function updateCells() {
 function pumpCells(n) {
   while (queue.length && n-- > 0) {
     const [i, j] = queue.shift(), k = i + ',' + j;
-    if (!cells.has(k)) cells.set(k, genCell(i, j));
+    if (!cells.has(k)) { cells.set(k, genCell(i, j)); HOLES.dirty = true; }
   }
+  if (HOLES.dirty) updateHoles();
 }
 
 /* ---------- physics ---------- */
@@ -2978,7 +3016,19 @@ const fwd = new THREE.Vector3(), tmp = new THREE.Vector3();
 const MAX = 46;
 const RATIOS = [0, 3.6, 2.3, 1.65, 1.25, 1.0], RPM_PER_MS = 90, REDLINE = 7000, IDLE = 900;
 Object.assign(car, { rpm: IDLE, gear: 1, shiftT: 0, throttle: 0, slip: 0, accel: 0, yaw: 0, popT: 0,
-  pitch: 0, pitchV: 0, roll: 0, rollV: 0, heave: 0, heaveV: 0 });
+  pitch: 0, pitchV: 0, roll: 0, rollV: 0, heave: 0, heaveV: 0,
+  gy: 0, gPitch: 0, gRoll: 0 });                              // the ground under the car, and how the car lies on its slope
+// The car and the hoverboard follow the ground into a sunken lot: no gravity, no bounce, no change of speed.
+function followGround(dt) {
+  const onGround = vehicle !== 'ship', px = car.pos.x, pz = car.pos.z, fx = -Math.sin(car.heading), fz = -Math.cos(car.heading);
+  car.gy = onGround ? groundAt(px, pz) : 0;                    // the spaceship's floor stays at road level
+  const sf = onGround ? (groundAt(px + fx * 1.4, pz + fz * 1.4) - groundAt(px - fx * 1.4, pz - fz * 1.4)) / 2.8 : 0;
+  const sr = onGround ? (groundAt(px - fz * 0.9, pz + fx * 0.9) - groundAt(px + fz * 0.9, pz - fx * 0.9)) / 1.8 : 0;
+  const k = 1 - Math.exp(-dt / 0.25);
+  car.gPitch += (Math.atan(sf) - car.gPitch) * k; car.gRoll += (Math.atan(sr) - car.gRoll) * k;
+  camGy += (car.gy - camGy) * (1 - Math.exp(-dt / 0.4));       // the camera keeps its height above the car, without bobbing
+}
+let camGy = 0;
 const torque = rpm => 0.72 + 0.28 * Math.sin(clamp((rpm - 1000) / 5600, 0, 1) * Math.PI);
 function drive(dt) {
   const { up, down, left, right, brake, boost } = keys;
@@ -3109,7 +3159,7 @@ function collide() {
   for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
     const c = cells.get(i + ',' + j); if (!c || !c.solids) continue;
     for (const b of c.solids) {
-      if (b.y0 > 1.5 || b.y1 < 0.6) continue;
+      if (b.y0 > car.gy + 1.5 || b.y1 < car.gy + 0.6) continue;
       const x0 = i * C + b.x0 - r, x1 = i * C + b.x1 + r, z0 = j * C + b.z0 - r, z1 = j * C + b.z1 + r;
       if (car.pos.x <= x0 || car.pos.x >= x1 || car.pos.z <= z0 || car.pos.z >= z1) continue;
       const pens = [car.pos.x - x0, x1 - car.pos.x, car.pos.z - z0, z1 - car.pos.z];
@@ -3148,17 +3198,17 @@ function updateCamera(dt, t) {
   fwd.set(-Math.sin(car.heading), 0, -Math.cos(car.heading));
   if (!started) {
     orbit += dt * 0.12;
-    camera.position.set(car.pos.x + Math.sin(orbit) * 15, 4.2 + Math.sin(orbit * 0.7) * 1.2, car.pos.z + Math.cos(orbit) * 15);
-    look.set(car.pos.x, 3.2, car.pos.z); camera.lookAt(look); return;
+    camera.position.set(car.pos.x + Math.sin(orbit) * 15, 4.2 + Math.sin(orbit * 0.7) * 1.2 + camGy, car.pos.z + Math.cos(orbit) * 15);
+    look.set(car.pos.x, 3.2 + camGy, car.pos.z); camera.lookAt(look); return;
   }
   if (camMode === 2) {
-    camera.position.copy(car.pos).addScaledVector(fwd, -0.2); camera.position.y = vehicle === 'board' ? boardMesh.position.y + 1.9 : vehicle === 'ship' ? shipMesh.position.y + 0.55 : 1.2;
-    look.copy(car.pos).addScaledVector(fwd, 30); look.y = 1.2; camera.lookAt(look);
+    camera.position.copy(car.pos).addScaledVector(fwd, -0.2); camera.position.y = vehicle === 'board' ? boardMesh.position.y + 1.9 : vehicle === 'ship' ? shipMesh.position.y + 0.55 : 1.2 + car.gy;
+    look.copy(car.pos).addScaledVector(fwd, 30); look.y = 1.2 + car.gy; camera.lookAt(look);
   } else {
     const dist = camMode === 0 ? ({ board: 7.5, ship: 9 }[vehicle] || 9) : 22, h = camMode === 0 ? ({ board: 3.2, ship: 3.9 }[vehicle] || 3.2) : 11;
-    camWant.copy(car.pos).addScaledVector(fwd, -dist); camWant.y = h + car.alt;
+    camWant.copy(car.pos).addScaledVector(fwd, -dist); camWant.y = h + car.alt + camGy;
     camera.position.lerp(camWant, 1 - Math.exp(-((camMode === 0 ? 4.5 : 1.8) + Math.abs(car.speed) * 0.06) * dt));
-    camTarget.copy(car.pos).addScaledVector(fwd, camMode === 0 ? 6 : 2); camTarget.y = (camMode === 0 ? 1.4 : 3) + car.alt;
+    camTarget.copy(car.pos).addScaledVector(fwd, camMode === 0 ? 6 : 2); camTarget.y = (camMode === 0 ? 1.4 : 3) + car.alt + camGy;
     look.lerp(camTarget, 1 - Math.exp(-8 * dt)); camera.lookAt(look);
   }
   if (car.bump > 0) {
@@ -3273,16 +3323,17 @@ function frame() {
   carMesh.position.copy(car.pos);
   if (started) suspension(dt);
   carMesh.visible = vehicle === 'car'; boardMesh.visible = vehicle === 'board'; shipMesh.visible = vehicle === 'ship';
-  carMesh.position.y = car.heave;
+  followGround(dt);
+  carMesh.position.y = car.gy + car.heave;
   carMesh.rotation.set(0, car.heading, 0);
-  carMesh.rotateX(car.pitch); carMesh.rotateZ(car.roll);
+  carMesh.rotateX(car.pitch + car.gPitch); carMesh.rotateZ(car.roll + car.gRoll);
   if (vehicle === 'board') {
     const hover = 0.55 + Math.sin(elapsed * 2.1) * 0.05 + Math.sin(elapsed * 0.8) * 0.03;
     const carve = clamp(-car.yaw * car.speed * 0.014, -0.6, 0.6);        // deep lean into turns, like a snowboard carve
-    boardMesh.position.set(car.pos.x, hover + car.heave, car.pos.z);
+    boardMesh.position.set(car.pos.x, hover + car.heave + car.gy, car.pos.z);
     boardMesh.rotation.set(0, car.heading, 0);
-    boardMesh.rotateX(clamp(car.accel * 0.004, -0.08, 0.08));
-    boardMesh.rotateZ(carve + Math.sin(elapsed * 1.4) * 0.015);
+    boardMesh.rotateX(clamp(car.accel * 0.004, -0.08, 0.08) + car.gPitch);
+    boardMesh.rotateZ(carve + Math.sin(elapsed * 1.4) * 0.015 + car.gRoll);
     board.glow.position.set(0, -hover + 0.07, 0); board.glow.rotation.set(-Math.PI / 2 - boardMesh.rotation.x, 0, 0);
     // rider: crouch when pushing or boosting, lean body over the carve, tuck on brake
     const crouch = 0.1 * car.throttle + 0.18 * car.boosting + (keys.down ? 0.1 : 0);
