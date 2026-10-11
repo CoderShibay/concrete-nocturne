@@ -1826,7 +1826,8 @@ ground.rotation.x = -Math.PI / 2; scene.add(ground);
 const car = { alt: 0, vy: 0, boost: 1, boosting: 0, pos: new THREE.Vector3(C + R / 2 + 3, 0, (DS - 1) * C + 40), heading: 0, speed: 0, vel: new THREE.Vector3(), steer: 0, bump: 0, drift: 0 };
 const carMesh = new THREE.Group(); scene.add(carMesh);
 const frontWheels = [], flames = [], wheelRings = [];
-let boostLight = null;
+const HEADLIGHT = 1.2;                    // the saloon's headlight at night
+let boostLight = null, headlight = null;
 // place a thin bar between two points (car-local)
 function barBetween(parent, a, b, mat, t = 0.05) {
   const d = new THREE.Vector3().subVectors(b, a), m = new THREE.Mesh(new THREE.BoxGeometry(t, t, d.length()), mat);
@@ -1879,8 +1880,8 @@ function profileGeo(pts, width, bevel = 0.05) {
     if (z < 0) frontWheels.push(piv);
   }
   add(new THREE.CylinderGeometry(0.035, 0.035, 0.3, 8).rotateX(Math.PI / 2), black, -0.5, 0.26, 2.3);   // exhaust pipe
-  // lights: headlamps down the road, a warm cabin, red on the wet tarmac behind
-  const head = new THREE.SpotLight(0xfff0d8, 2.2, 90, 0.46, 0.6, 1.1); head.position.set(0, 0.64, -2.3);
+  // lights: one real headlight down the road (on at night, off by day), a warm cabin, red on the wet tarmac behind
+  const head = headlight = new THREE.SpotLight(0xfff0d6, HEADLIGHT, 70, 0.5, 0.6, 1.1); head.position.set(0, 0.64, -2.3);
   head.target.position.set(0, 0, -22); carMesh.add(head); carMesh.add(head.target);
   const tail = new THREE.PointLight(0xff2a1e, 0.8, 7, 2); tail.position.set(0, 0.7, 2.9); carMesh.add(tail);
   // booster: a short orange flame from the exhaust
@@ -2560,6 +2561,7 @@ function setDay(d) {
   moonLight.color.setHex(L.sun); moonLight.position.set(...L.sunPos);
   skyGroup.visible = !d;                                            // no moon or stars by day
   mats.lamp.color.setHex(L.lamp); mats.lampv.color.setHex(L.lampv);
+  headlight.intensity = d ? 0 : HEADLIGHT;
   for (const k of ['glow', 'glowv', 'glowc', 'glowd']) mats[k].visible = !d;   // no light pools on the road in daylight
   if (bloom) bloom.threshold = L.bloomT;
   ground.material.color.setHex(d ? 0x8c8c8c : 0xffffff);          // tame the asphalt speckle in full daylight
