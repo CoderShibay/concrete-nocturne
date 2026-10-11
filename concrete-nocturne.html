@@ -1309,7 +1309,7 @@ function genCell(i, j) {
 
   if (zone === 'corridor') {
     // P5 + P11: the same twin slabs block after block, one lit sky bridge between them that nobody crosses
-    plinth(3);
+    plinth(FLAT);
     const alongX = zr() < 0.5, key = zr() < 0.5 ? 'win0' : 'win1', h = 160 + zr() * 60, b1 = 3 + h * (0.22 + zr() * 0.1), b2 = b1 + 30 + zr() * 20;
     const sw = 14, sl = L - 4, gap = L - 2 - 2 * sw;
     for (const a of [A + 1 + sw / 2, B - 1 - sw / 2]) tower(key, alongX ? sw : sl, h, alongX ? sl : sw, alongX ? a : mid, alongX ? mid : a, ph, same);
@@ -1402,7 +1402,7 @@ function genCell(i, j) {
     signChance = 0; lampOn = 0.6;
   } else if (zone === 'residential') {
     // P3 (first pass): a wall of housing slabs, most of their windows dark
-    plinth(2.5);
+    plinth(FLAT);
     const alongX = rnd() < 0.5, n = 3, sw = 12, gap = (L - 2 - n * sw) / (n - 1), hb = 130 + rnd() * 50;
     for (let k = 0; k < n; k++) {
       const a = A + 1 + sw / 2 + k * (sw + gap), key = rnd() < 0.55 ? 'win4' : 'win0';
@@ -1426,9 +1426,9 @@ function genCell(i, j) {
   } else {
     // corner: the ordinary mixed city, the only place with street-level neon
     const vacant = rnd() < 0.14;
-    plinth(vacant ? FLAT : 1.6 + rnd() * 3.5);
-    if (rnd() < 0.25) { const k = neon(); addBox(bk, k, k, L + 0.1, 0.18, 0.18, mid, ph - 0.35, A - 0.02); }
-    if (rnd() < 0.15) { const k = neon(); addBox(bk, k, k, 0.18, 0.18, L + 0.1, A - 0.02, ph - 0.35, mid); }
+    plinth(FLAT); rnd();                                                       // flush paving everywhere: only the buildings stop you
+    if (rnd() < 0.25) { const k = neon(); addBox(bk, k, k, L + 0.1, 0.18, 0.18, mid, 0.12, A - 0.02); }
+    if (rnd() < 0.15) { const k = neon(); addBox(bk, k, k, 0.18, 0.18, L + 0.1, A - 0.02, 0.12, mid); }
     const t = rnd();
     if (vacant) { // an empty lot: one vending machine glowing to nobody
       const vx = A + 3 + rnd() * (L - 6), vz = A + 1.2;
@@ -2702,6 +2702,7 @@ function drive(dt) {
   let a = 0;
   if (throttleOn && car.speed > -0.5) a += 18 * torque(car.rpm) * Math.pow(RATIOS[car.gear] / 1.6, 0.3) * (car.rpm >= REDLINE - 400 ? 0.3 : 1);
   if (down) a -= car.speed > 1 ? 26 : 7;
+  if (up && car.speed < -0.5) a += 26;                                       // rolling back after a knock: throttle stops it first
   if (!up && !down) a -= Math.sign(car.speed) * (0.6 + 0.9 * RATIOS[car.gear] / 3.6) * Math.min(1, Math.abs(car.speed)); // engine braking
   a -= Math.sign(car.speed) * (0.0022 * car.speed * car.speed + 0.35); // aero drag + rolling
   if (brake) a -= car.speed * 0.7;
@@ -2780,10 +2781,23 @@ function collide() {
       const n = [[-1, 0], [1, 0], [0, -1], [0, 1]][m];
       car.pos.x += n[0] * pens[m]; car.pos.z += n[1] * pens[m];
       const vn = car.vel.x * n[0] + car.vel.z * n[1];
+      // the nose turns along the wall, so you glance off and keep going instead of grinding into it
+      const into = -(fwd.x * n[0] + fwd.z * n[1]) * Math.sign(car.speed || 1);
+      if (into > 0) {
+        let tx = -n[1], tz = n[0]; const sg = car.speed < 0 ? -1 : 1;
+        let side = (fwd.x * tx + fwd.z * tz) * sg;                             // which way along the wall you were already going
+        if (Math.abs(side) < 0.08) side = car.vel.x * tx + car.vel.z * tz || (keys.right ? 1 : -1) * (n[0] * tz - n[1] * tx);
+        if (side < 0) { tx = -tx; tz = -tz; }
+        const want = Math.atan2(-tx * sg, -tz * sg);
+        let dh = want - car.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+        car.heading += dh * Math.min(1, 0.12 + 0.2 * into);
+        fwd.set(-Math.sin(car.heading), 0, -Math.cos(car.heading));
+      }
       if (vn < 0) {
-        car.vel.x -= n[0] * vn * 1.25; car.vel.z -= n[1] * vn * 1.25;
-        car.vel.multiplyScalar(0.8);
-        car.speed = car.vel.dot(fwd);
+        const sp = car.vel.length() || 1, square = -vn / sp;                  // 0 = a glance, 1 = head on
+        car.vel.x -= n[0] * vn * 1.15; car.vel.z -= n[1] * vn * 1.15;         // off the wall with a small bounce
+        car.vel.multiplyScalar(1 - 0.45 * square * square);                    // a glance costs almost nothing
+        car.speed = car.vel.length() * (car.vel.dot(fwd) < 0 ? -1 : 1);
         const hit = Math.min(1, -vn / 20);
         if (hit > 0.15) { car.bump = Math.max(car.bump, hit); radio.thump(hit); car.heaveV += hit * 1.5; car.rollV += (Math.random() - 0.5) * hit * 2; }
       }

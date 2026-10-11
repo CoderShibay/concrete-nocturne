@@ -35,7 +35,8 @@ On a phone, touch buttons replace the keys.
 
 The city is endless and built block by block around the car (100 m blocks with 30 m, six-lane roads;
 12×12 blocks to a district, so each zone lasts about 30–50 seconds of driving). Buildings stand 7 m back
-inside their lots, so there is a drivable apron of paving around them, and empty lots are open ground.
+inside their lots and every lot is flush paving, so you can drive anywhere a building isn't. Hit a wall and
+the car turns along it and slides off instead of stopping dead.
 
 A small **director** decides what each new district becomes and when something happens.
 
