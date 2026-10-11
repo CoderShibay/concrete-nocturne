@@ -1277,11 +1277,11 @@ function addQuad(bk, key, x, z, w, d, y) {   // a flat rectangle facing up: w al
   const q = [[-hx, -hz, 0, 0], [-hx, hz, 0, 1], [hx, hz, 1, 1], [-hx, -hz, 0, 0], [hx, hz, 1, 1], [hx, -hz, 1, 0]];
   for (const [dx, dz, u, v] of q) { b.p.push(x + dx, y, z + dz); b.n.push(0, 1, 0); b.u.push(u, v); }
 }
-// An upright slab standing on (x0..x1, z0..z1) from yb up to yt. No underside.
-function addSlab(bk, key, x0, x1, z0, z1, yb, yt) {
+// A slab standing on (x0..x1, z0..z1) from yb up to yt. Its top can be shifted sideways (sx, sz) so it leans. No underside.
+function addSlab(bk, key, x0, x1, z0, z1, yb, yt, sx = 0, sz = 0) {
   const b = bucket(bk, key);
   const quad = (p, q, r, t, nx, ny, nz) => { for (const v of [p, q, r, p, r, t]) { b.p.push(v[0], v[1], v[2]); b.n.push(nx, ny, nz); b.u.push(0, 0); } };
-  const B = (x, z) => [x, yb, z], T = (x, z) => [x, yt, z];
+  const B = (x, z) => [x, yb, z], T = (x, z) => [x + sx, yt, z + sz];
   quad(T(x0, z0), T(x0, z1), T(x1, z1), T(x1, z0), 0, 1, 0);
   quad(B(x0, z0), T(x0, z0), T(x1, z0), B(x1, z0), 0, 0, -1); quad(B(x1, z1), T(x1, z1), T(x0, z1), B(x0, z1), 0, 0, 1);
   quad(B(x0, z1), T(x0, z1), T(x0, z0), B(x0, z0), -1, 0, 0); quad(B(x1, z0), T(x1, z0), T(x1, z1), B(x1, z1), 1, 0, 0);
@@ -1357,7 +1357,7 @@ const FIELD = { cols: 8, rows: 5, w: 2.6, l: 6.2, a0: 37.1, da: 7.6, b0: 39.5, d
 const fieldCache = new Map();
 function fieldOf(di, dj) {                                   // one direction and one slow swell for the whole district
   const k = di + ',' + dj; let f = fieldCache.get(k);
-  if (!f) { const r = mulberry(hash2(di, dj, 29)); f = { turn: r() < 0.5, a: r() * 6.28, b: r() * 6.28 }; fieldCache.set(k, f); }
+  if (!f) { const r = mulberry(hash2(di, dj, 29)); f = { turn: r() < 0.5, a: r() * 6.28, b: r() * 6.28, c: r() * 6.28 }; fieldCache.set(k, f); }
   return f;
 }
 const smooth = v => { v = clamp(v, 0, 1); return v * v * (3 - 2 * v); };
@@ -1365,6 +1365,14 @@ const smooth = v => { v = clamp(v, 0, 1); return v * v * (3 - 2 * v); };
 const fieldIn = (lx, lz) => smooth((Math.min(lx - LOT_A, LOT_B - lx, lz - LOT_A, LOT_B - lz) - 4) / 27);
 // the swell, 0.35 to 1: some lots stay shallow, some go deep
 const fieldSwell = (f, li, lj) => 0.675 + 0.325 * Math.sin(li * 0.9 + f.a) * Math.sin(lj * 0.7 + f.b);
+// The lean of a slab, as (x, z) slope of its top: at most 1.5°, taken from a smooth field over the district so that
+// neighbours lean in related directions. It should read as ground that has settled, not as jitter.
+const LEAN = Math.tan(1.5 * Math.PI / 180);
+function fieldLean(f, x, z) {
+  const ang = f.c + 2.2 * Math.sin(x * 0.011 + f.a) + 2.2 * Math.sin(z * 0.013 + f.b);          // which way the ground went
+  const amt = LEAN * (0.55 + 0.45 * Math.sin(x * 0.019 + z * 0.023 + f.c));                      // how far
+  return [Math.cos(ang) * amt, Math.sin(ang) * amt];
+}
 // lot-local centres of the lanes that run along z (alongZ) or along x
 function fieldLanes(f, alongZ) {
   const cols = [], rows = [LOT_A + 2.75, LOT_B - 2.75];
@@ -1582,7 +1590,9 @@ function genCell(i, j) {
       const a = FIELD.a0 + c * FIELD.da, b = FIELD.b0 + r * FIELD.db;
       const x0 = f.turn ? b : a, z0 = f.turn ? a : b, x1 = x0 + (f.turn ? FIELD.l : FIELD.w), z1 = z0 + (f.turn ? FIELD.w : FIELD.l);
       const top = Math.max(FIELD.edge, FIELD.edge + FIELD.rise * fieldIn((x0 + x1) / 2, (z0 + z1) / 2) * w + (rnd() - 0.5) * 0.5);
-      addSlab(bk, 'stele', x0, x1, z0, z1, ph, top);
+      // about three slabs in ten stay upright; the rest lean a little. The collision box stays upright.
+      const [tx, tz] = rnd() < 0.3 ? [0, 0] : fieldLean(f, (li * C + x0 + x1) / 2, (lj * C + z0 + z1) / 2);
+      addSlab(bk, 'stele', x0, x1, z0, z1, ph, top, tx * (top - ph), tz * (top - ph));
       solids.push({ x0, x1, z0, z1, y0: 0, y1: top });
     }
     lampOn = 0.5; sodium = true;
