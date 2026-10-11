@@ -1116,6 +1116,23 @@ function concreteMaterial() {
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso;
   return new THREE.MeshStandardMaterial({ map: t, roughness: 0.96, metalness: 0 });
 }
+// A lit office floor seen through its glass band: a grid of ceiling light panels over rows of desks, no one at them.
+function officeLitMaterial() {
+  const W = 256, H = 96, c = mkCanvas(W, H), x = c.getContext('2d');             // one tile is 8 m of facade, 2.4 m high
+  x.fillStyle = '#56625a'; x.fillRect(0, 0, W, H);                               // the back wall
+  x.fillStyle = '#2f3833'; x.fillRect(0, 0, W, 24);                              // ceiling void
+  x.fillStyle = '#ffffff'; for (let k = 0; k < 4; k++) x.fillRect(k * 64 + 10, 8, 44, 9);   // light panels
+  x.fillStyle = '#3b453f'; x.fillRect(0, 78, W, 18);                             // floor
+  x.fillStyle = '#121815';
+  for (let k = 0; k < 3; k++) {                                                  // desk, screen, chair back
+    const d = k * 85 + 12; x.fillRect(d, 62, 50, 4); x.fillRect(d + 3, 66, 3, 22); x.fillRect(d + 44, 66, 3, 22);
+    x.fillRect(d + 16, 48, 17, 12); x.fillRect(d + 23, 60, 3, 3); x.fillRect(d + 56, 50, 12, 24); x.fillRect(d + 60, 74, 3, 14);
+  }
+  x.fillStyle = '#0d1114'; for (let k = 0; k < W; k += 64) x.fillRect(k, 0, 3, H);  // mullions
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso;
+  return new THREE.MeshBasicMaterial({ map: t, color: OFFICE_LIT });
+}
+const OFFICE_LIT = 0xcfe3d2;
 const glowTex = radialTex('rgba(255,255,255,1)', 'rgba(255,255,255,0)');
 const glowMat = (color, opacity) => new THREE.MeshBasicMaterial({ map: glowTex, color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 
@@ -1139,9 +1156,14 @@ const mats = {
   glowv: glowMat(0x7fcf9a, 0.32),
   glowd: glowMat(0x8fe0a4, 0.6),
   beacon: new THREE.MeshBasicMaterial({ color: 0xff2040 }),
+  glassDark: new THREE.MeshStandardMaterial({ color: 0x0d1114, roughness: 0.15, metalness: 0.6 }),   // unlit glass
+  panel: new THREE.MeshStandardMaterial({ color: 0x55585c, roughness: 0.7 }),
+  officeLit: officeLitMaterial(),
+  paint: new THREE.MeshStandardMaterial({ color: 0x8a8b8f, roughness: 0.8 }),                        // car-park lines, not lit
+  glowf: glowMat(0xd6ecd0, 0.3),
 };
 NEON.forEach((c, k) => { mats['neon' + k] = new THREE.MeshBasicMaterial({ color: c }); });
-const UV = { concrete: [16, 16] };
+const UV = { concrete: [16, 16], officeLit: [8, 2.4] };
 const uvFor = k => k.startsWith('win') ? [TEX_W, TEX_H] : (UV[k] || [4, 4]);
 
 /* ---------- neon sign textures ---------- */
@@ -1171,6 +1193,18 @@ function adTexture(lines) {
   x.fillStyle = '#8a8378'; x.font = '400 13px "Helvetica Neue",Arial,sans-serif';
   x.fillText('Terms apply. Units from the 40th floor.', 22, H - 30);
   x.fillStyle = '#b8472a'; x.fillRect(22, H - 70, 60, 6);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = aniso; return t;
+}
+// Office Park: a low lit sign by the road corner of every lot. Only the text changes.
+const OFFICE_SIGNS = ['UNIT 14', 'UNIT 22–40', 'TO LET', 'VISITORS REPORT TO RECEPTION', 'DELIVERIES →'];
+let officeSignMats = [];
+function officeSignTexture(text) {
+  const W = 512, H = 128, c = mkCanvas(W, H), x = c.getContext('2d');
+  x.fillStyle = '#e3e8e2'; x.fillRect(0, 0, W, H); x.fillStyle = '#55585c'; x.fillRect(0, 0, W, 10);
+  x.fillStyle = '#1c2420'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  let fs = 60; x.font = `500 ${fs}px "Helvetica Neue",Arial,sans-serif`;
+  while (x.measureText(text).width > W - 50 && fs > 16) { fs -= 2; x.font = `500 ${fs}px "Helvetica Neue",Arial,sans-serif`; }
+  x.fillText(text, W / 2, H / 2 + 6);
   const t = new THREE.CanvasTexture(c); t.anisotropy = aniso; return t;
 }
 function signTexture(text, color, vertical) {
@@ -1217,13 +1251,21 @@ function addFlat(bk, key, x, z, s, y) {
   const q = [[-h, -h, 0, 0], [h, -h, 1, 0], [h, h, 1, 1], [-h, -h, 0, 0], [h, h, 1, 1], [-h, h, 0, 1]];
   for (const [dx, dz, u, v] of q) { b.p.push(x + dx, y, z + dz); b.n.push(0, 1, 0); b.u.push(u, v); }
 }
+function addQuad(bk, key, x, z, w, d, y) {   // a flat rectangle facing up: w along x, d along z
+  const b = bucket(bk, key), hx = w / 2, hz = d / 2;
+  const q = [[-hx, -hz, 0, 0], [-hx, hz, 0, 1], [hx, hz, 1, 1], [-hx, -hz, 0, 0], [hx, hz, 1, 1], [hx, -hz, 1, 0]];
+  for (const [dx, dz, u, v] of q) { b.p.push(x + dx, y, z + dz); b.n.push(0, 1, 0); b.u.push(u, v); }
+}
+function geoOf(b) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(b.u, 2));
+  g.computeBoundingSphere(); return g;
+}
 function flush(bk, grp, geos) {
   for (const k in bk) {
-    const b = bk[k], g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(b.u, 2));
-    g.computeBoundingSphere();
+    const g = geoOf(bk[k]);
     const m = new THREE.Mesh(g, mats[k]); if (k.startsWith('glow')) m.renderOrder = 1;
     grp.add(m); geos.push(g);
   }
@@ -1232,9 +1274,10 @@ function flush(bk, grp, geos) {
 /* ---------- director: decides what each new district becomes ---------- */
 // The city stays endless. Each 3×3-block district gets one zone the first time it comes into range,
 // following the drive's order (sameness → scale → exposure → people you can't reach → fading out).
-const ZONES = ['corridor', 'boulevard', 'plaza', 'interchange', 'residential', 'corner', 'fog'];
+const ZONES = ['corridor', 'office', 'boulevard', 'plaza', 'interchange', 'residential', 'corner', 'fog'];
 const ZONE_NAMES = {
   corridor: ['The Long Repeat', 'Parallel Row', 'Corridor Nine', 'Same Street'],
+  office: ['Business Park 3', 'Units 14–40', 'The Low Glass', 'Parkway South'],
   boulevard: ['Ceremonial Axis', 'The Wide Avenue', 'Parade Road', 'Twenty Lanes'],
   plaza: ['Assembly Square', 'Monument Field', 'The Open Ground', 'Square of Flags'],
   interchange: ['Junction 14', 'Exit to Elsewhere', 'Under the Ramps', 'Interchange West'],
@@ -1246,7 +1289,7 @@ const director = { distanceDriven: 0, driveTime: 0, sinceLastMoment: 0, nextGap:
 // Moments: one small sign of other people at a time, 30–50 s apart (the rhythm). A moment is placed in the block
 // that is about to appear ahead of the car; it only counts once the car has actually passed it.
 const moments = { pending: false, active: null, cache: new Map(), lingering: [] };
-const MOMENT_FOR = { corridor: 'bridge', boulevard: 'window', plaza: 'lamp', interchange: 'train', residential: 'silhouette', corner: 'diner', fog: 'lampsOff' };
+const MOMENT_FOR = { corridor: 'bridge', office: 'sensor', boulevard: 'window', plaza: 'lamp', interchange: 'train', residential: 'silhouette', corner: 'diner', fog: 'lampsOff' };
 const districtZones = new Map();          // "di,dj" → zone, so returning to a district shows the same thing
 const DS = 12;                            // blocks per side of a district: about 1.1 km, 30-50 s of driving per zone
 const districtOf = v => Math.floor(v / DS);
@@ -1303,7 +1346,7 @@ function genCell(i, j) {
     facades.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, y0: base, y1: base + h });
     roofs.push({ x, z, w, d, y: base + h });
   };
-  let ph = 1, signChance = 0, lampOn = 0.7;
+  let ph = 1, signChance = 0, lampOn = 0.7, sodium = false, hum = null;
   const FLAT = 0.06;                                                           // a flush plinth: just paving, you can drive across it
   const plinth = h => { ph = h; addBox(bk, 'concrete', 'roof', L, ph, L, mid, ph / 2, mid, rnd); solids.push({ x0: A, x1: B, z0: A, z1: B, y0: 0, y1: ph }); };
 
@@ -1318,6 +1361,66 @@ function genCell(i, j) {
     for (const by of [b1, b2]) { const hx = alongX ? gap / 2 + 1 : 4.5, hz = alongX ? 4.5 : gap / 2 + 1; solids.push({ x0: mid - hx, x1: mid + hx, z0: mid - hz, z1: mid + hz, y0: by - 2.25, y1: by + 2.25 }); }
     if (litBridge) momentPos = new THREE.Vector3(i * C + mid, b1, j * C + mid);
     lampOn = 0.75;
+  } else if (zone === 'office') {
+    // Office Park: the same low glass office at the back of every lot, behind a painted car park with nobody parked.
+    // The lit floors are on timers, not people, so they stay on all night while the towers around them go dark.
+    plinth(FLAT);
+    const sensor = mom && mom.type === 'sensor';                               // the one building that is dark until you come near
+    const bx0 = 43, bx1 = 87, bz0 = 74, bz1 = 90, bw = bx1 - bx0, bd = bz1 - bz0, bcx = (bx0 + bx1) / 2, bcz = (bz0 + bz1) / 2;
+    const litF = [0, 1, 2].map(() => rnd() < 0.55), bands = [];
+    for (let f = 0; f < 3; f++) {                                              // three floors: a glass band, then a plain panel
+      const y = ph + f * 3.8;
+      addBox(bk, 'panel', 'roof', bw, 1.4, bd, bcx, y + 3.1, bcz);
+      if (sensor) {                                                            // its bands are separate meshes, so they can switch
+        const b2 = {}; addBox(b2, 'officeLit', 'roof', bw, 2.4, bd - 0.4, bcx, y + 1.2, bcz);
+        const g = geoOf(b2.officeLit), band = new THREE.Mesh(g, mats.glassDark); grp.add(band); extras.push(g); bands.push(band);
+      } else addBox(bk, litF[f] ? 'officeLit' : 'glassDark', 'roof', bw, 2.4, bd - 0.4, bcx, y + 1.2, bcz);
+    }
+    solids.push({ x0: bx0, x1: bx1, z0: bz0, z1: bz1, y0: 0, y1: ph + 11.4 });
+    hum = { x: i * C + bcx, z: j * C + bcz, hx: bw / 2, hz: bd / 2, on: !sensor && litF.some(Boolean) };
+    // entrance canopy on two posts, one tube under it
+    addBox(bk, 'roof', 'roof', 6, 0.3, 3, bcx, ph + 3.05, bz0 - 1.5);
+    for (const px of [bcx - 2.7, bcx + 2.7]) addBox(bk, 'pole', 'pole', 0.15, 2.9, 0.15, px, ph + 1.45, bz0 - 2.8);
+    addBox(bk, 'fluo', 'fluo', 5, 0.05, 0.25, bcx, ph + 2.87, bz0 - 1.5);
+    // car park: two rows of bays, white lines only, flush and drivable
+    for (const z0 of [44, 55]) for (let x = bx0; x <= bx1; x += 2.5) addQuad(bk, 'paint', x, z0 + 2.5, 0.12, 5, ph + 0.02);
+    for (const lz of [46.5, 58.5]) {                                           // two white lighting columns
+      addBox(bk, 'pole', 'pole', 0.2, 6, 0.2, 91, ph + 3, lz); addBox(bk, 'fluo', 'fluo', 0.9, 0.18, 0.4, 91, ph + 6.05, lz);
+      addFlat(bk, 'glowf', 91, lz, 16, ph + 0.04);
+      solids.push({ x0: 90.7, x1: 91.3, z0: lz - 0.3, z1: lz + 0.3, y0: 0, y1: 6 });
+    }
+    // low sign plinth by the road corner, lit on both faces
+    addBox(bk, 'concrete', 'concrete', 4, 1.1, 0.5, 38.5, ph + 0.55, 38);
+    const sm = officeSignMats[Math.floor(rnd() * officeSignMats.length)];
+    for (const sgn of [-1, 1]) { const f = new THREE.Mesh(planeGeo, sm); f.scale.set(3.8, 0.9, 1); f.position.set(38.5, ph + 0.57, 38 + sgn * 0.26); f.rotation.y = sgn > 0 ? 0 : Math.PI; grp.add(f); }
+    solids.push({ x0: 36.5, x1: 40.5, z0: 37.75, z1: 38.25, y0: 0, y1: 1.1 });
+    if (rnd() < 0.15) {                                                        // one parked car, far from the door
+      const x = 82.55, z = 58.5;
+      addBox(bk, 'roof', 'roof', 1.9, 0.75, 4.4, x, ph + 0.55, z); addBox(bk, 'dark', 'dark', 1.6, 0.5, 2.2, x, ph + 1.15, z + 0.3);
+      solids.push({ x0: x - 0.95, x1: x + 0.95, z0: z - 2.2, z1: z + 2.2, y0: 0, y1: 1.4 });
+    }
+    if (sensor) {
+      // moment: the building that notices you. Floor 1 flickers on like a tube starting, then floor 2, then floor 3.
+      // They stay on while you are near and go off from the top after you leave. It is a motion sensor.
+      let phase = 'dark', t0 = 0; const was = [false, false, false], bwx = i * C + bcx, bwz = j * C + bcz;
+      ticks.push((dt, t) => {
+        const px = car.pos.x - i * C, pz = car.pos.z - j * C;
+        const d = Math.hypot(Math.max(bx0 - px, 0, px - bx1), Math.max(bz0 - 20 - pz, 0, pz - bz1));   // it watches the building and the near row of bays
+        if (phase !== 'on' && d < 45) { phase = 'on'; t0 = t; mom.near = true; }
+        else if (phase === 'on' && d > 70) { phase = 'leaving'; t0 = t; }
+        else if (phase === 'leaving' && t - t0 > 4.5) phase = 'dark';
+        for (let f = 0; f < 3; f++) {
+          const e = t - t0 - f * 0.5;
+          const lit = phase === 'on' ? e >= 0 && (e > 0.4 || Math.floor(e / 0.0667) % 2 === 0) : phase === 'leaving' && t - t0 < 4.5 - f;
+          if (phase === 'on' && e >= 0 && !was[f]) { was[f] = true; radio.click(panFor(bwx, bwz), 0.5); }
+          if (phase !== 'on') was[f] = false;
+          bands[f].material = lit ? mats.officeLit : mats.glassDark;
+        }
+        hum.on = bands.some(b => b.material === mats.officeLit);
+      });
+      momentPos = new THREE.Vector3(bwx, 0, j * C + bz0 - 2);
+    }
+    lampOn = 0.9; sodium = true;
   } else if (zone === 'boulevard') {
     // P1 + P2: an open forecourt; the tower stands far back from every road, so the street reads far wider
     plinth(FLAT);
@@ -1523,7 +1626,7 @@ function genCell(i, j) {
   }
 
   // street lamps with sodium light pools on the road; how many still work depends on the zone
-  const violet = rnd() < 0.08, lk = violet ? 'lampv' : 'lamp', gk = violet ? 'glowv' : 'glow';
+  const violet = rnd() < 0.08 && !sodium, lk = violet ? 'lampv' : 'lamp', gk = violet ? 'glowv' : 'glow';
   const solo = mom && mom.type === 'lampsOff' ? [] : null;
   if (solo) lampOn = 1;
   const lamp = (x, z, dx, dz) => {
@@ -1551,7 +1654,7 @@ function genCell(i, j) {
 
   flush(bk, grp, geos);
   scene.add(grp);
-  return { grp, geos, signMats, flick, zone, extras, momentPos, solids, tick: ticks.length ? (dt, t) => ticks.forEach(f => f(dt, t)) : null };
+  return { grp, geos, signMats, flick, zone, extras, momentPos, solids, hum, tick: ticks.length ? (dt, t) => ticks.forEach(f => f(dt, t)) : null };
 }
 function disposeCell(c) {
   scene.remove(c.grp); c.geos.forEach(g => g.dispose()); c.signMats.forEach(m => m.dispose()); c.extras.forEach(x => x.dispose());
@@ -2246,6 +2349,11 @@ const radio = {
     this.roofG = loop(drops(2.3, 150), [['bandpass', 520, 0.8]], 0.0);
     this.spray = mk(nb, 'bandpass', 2600, 0.7);
 
+    // the hum of a lit office floor: mains and its octave, panned to the building
+    this.humG = ctx.createGain(); this.humG.gain.value = 0; this.humP = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    for (const f of [100, 200]) { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(this.humG); o.start(); }
+    if (this.humP) { this.humG.connect(this.humP); this.humP.connect(comp); } else this.humG.connect(comp);
+
     this.full = true;   // rain, engine, hover hum and the rest are all in place
   },
   mtof: n => 440 * Math.pow(2, (n - 69) / 12),
@@ -2498,11 +2606,15 @@ const radio = {
     for (const f of [440, 480]) { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(out); o.start(t); o.stop(t + 1.3); }
     for (const [a, b] of [[0, 0.45], [0.65, 1.1]]) for (let k = t + a; k < t + b; k += 0.05) { out.gain.setValueAtTime(0.028, k); out.gain.setValueAtTime(0, k + 0.025); }
   },
-  click(pan) { // a relay somewhere as a lamp goes out
+  hum(level, pan) {
+    if (!this.full) return; const t = this.ctx.currentTime;
+    this.humG.gain.setTargetAtTime(0.015 * level, t, 0.3); if (this.humP) this.humP.pan.setTargetAtTime(pan, t, 0.2);
+  },
+  click(pan, v = 1) { // a relay somewhere as a lamp goes out
     if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, s2 = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
     s2.buffer = this.noise; f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 3;
-    g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    g.gain.setValueAtTime(0.05 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
     s2.connect(f); f.connect(g); if (p) { p.pan.value = pan; g.connect(p); p.connect(this.comp); p.connect(this.rev); } else g.connect(this.comp);
     s2.start(t, Math.random()); s2.stop(t + 0.06);
   },
@@ -2562,7 +2674,8 @@ function setDay(d) {
   skyGroup.visible = !d;                                            // no moon or stars by day
   mats.lamp.color.setHex(L.lamp); mats.lampv.color.setHex(L.lampv);
   headlight.intensity = d ? 0 : HEADLIGHT;
-  for (const k of ['glow', 'glowv', 'glowc', 'glowd']) mats[k].visible = !d;   // no light pools on the road in daylight
+  mats.officeLit.color.setHex(d ? 0x39403c : OFFICE_LIT);          // by day the office lights don't show through the glass
+  for (const k of ['glow', 'glowv', 'glowc', 'glowd', 'glowf']) mats[k].visible = !d;   // no light pools on the road in daylight
   if (bloom) bloom.threshold = L.bloomT;
   ground.material.color.setHex(d ? 0x8c8c8c : 0xffffff);          // tame the asphalt speckle in full daylight
   for (const obj of [carMesh, shipMesh]) obj.traverse(m => {     // the warm dash glow is for the night; by day the glass is just glass
@@ -2864,7 +2977,7 @@ function updateHud(elapsed) {
 
 /* ---------- map ---------- */
 // Blocks tinted by zone, your route as a faint sodium line. Moments are never shown: they stay surprises.
-const ZONE_TINT = { corridor: '#33363d', boulevard: '#3c3933', plaza: '#24272b', interchange: '#383742', residential: '#3a3632', corner: '#4b3d2b', fog: '#20242b' };
+const ZONE_TINT = { corridor: '#33363d', office: '#2f3338', boulevard: '#3c3933', plaza: '#24272b', interchange: '#383742', residential: '#3a3632', corner: '#4b3d2b', fog: '#20242b' };
 const route = [], visitedDistricts = new Map();
 function mapRecord() {
   const last = route[route.length - 1];
@@ -3032,6 +3145,14 @@ function frame() {
     const lx = ((car.pos.x % C) + C) % C, lz = ((car.pos.z % C) + C) % C;
     const inCross = lx < R && lz < R;
     radio.engine(car, !inCross, vehicle === 'car' ? null : vehicle);
+    // within 30 m of a lit office floor: a faint fluorescent hum from that side
+    let humL = 0, humPan = 0;
+    if (car.alt < 10) for (const cell of cells.values()) {
+      const h = cell.hum; if (!h || !h.on) continue;
+      const d = Math.hypot(Math.max(Math.abs(car.pos.x - h.x) - h.hx, 0), Math.max(Math.abs(car.pos.z - h.z) - h.hz, 0));
+      if (d < 30 && 1 - d / 30 > humL) { humL = 1 - d / 30; humPan = panFor(h.x, h.z); }
+    }
+    radio.hum(humL, humPan);
     // lamp posts every 26 m along both road axes: whoosh as they pass
     const cellX = Math.floor(car.pos.x / 26), cellZ = Math.floor(car.pos.z / 26);
     if ((cellX !== lastLampX || cellZ !== lastLampZ) && Math.abs(car.speed) > 14 && car.alt < 10) {
@@ -3062,6 +3183,7 @@ async function boot() {
   roadSignMats = ROAD_SIGNS.map(t => new THREE.MeshBasicMaterial({ map: roadSignTexture(t), color: 0xa6aaa6 }));
   adTex = ADS.map(adTexture);
   openTex = signTexture('OPEN', '#ff8a3a', false);
+  officeSignMats = OFFICE_SIGNS.map(t => new THREE.MeshBasicMaterial({ map: officeSignTexture(t), color: 0x9aa39c }));
   updateCells(); pumpCells(999);
   frame();
 }
