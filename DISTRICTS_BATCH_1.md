@@ -5,7 +5,7 @@
 Written by the design agent for the build session, against commit `def4eeb` (2026-10-11).
 Concepts and research sources: `DISTRICT_CONCEPTS.md` (#4, #3, #6). Rules: `LONELY_CITY_BRIEF.md`.
 
-> **Status:** the four open decisions were answered by Ali on 2026-10-11 and are written into the spec below. The wireframes still need his final yes before building starts.
+> **Status: APPROVED by Ali on 2026-10-12. Ready to build.** The wireframes (`wireframes/batch-1.html`) and the four decisions below are final.
 >
 > **Decisions:**
 > 1. Built by the build session, from this file.
