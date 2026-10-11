@@ -1,0 +1,326 @@
+<title>Nocturne Districts Batch 1</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Mono&family=PT+Sans+Narrow:wght@400;700&family=PT+Sans:wght@400;700&display=swap">
+<style>
+:root{
+  --paper:#eceff1; --panel:#f7f8f9; --ink:#1b2127; --dim:#5d6870; --line:#7c8790;
+  --fill:#c9d0d5; --fill2:#aeb7be; --road:#dfe3e6; --dark:#3a434b; --lit:#f1d9a6; --acc:#b4541a;
+  --display:"PT Sans Narrow","Arial Narrow",Arial,sans-serif;
+  --body:"PT Sans","Helvetica Neue",Arial,sans-serif;
+  --mono:"PT Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --paper:#12161a; --panel:#181d22; --ink:#e4e8eb; --dim:#98a3ab; --line:#77828b;
+    --fill:#39424a; --fill2:#4b565f; --road:#1f252b; --dark:#0b0e11; --lit:#e2b86a; --acc:#f0934d;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#12161a; --panel:#181d22; --ink:#e4e8eb; --dim:#98a3ab; --line:#77828b;
+  --fill:#39424a; --fill2:#4b565f; --road:#1f252b; --dark:#0b0e11; --lit:#e2b86a; --acc:#f0934d;
+}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:20px;padding-block:32px 64px;display:flex;flex-direction:column;gap:48px}
+header{display:flex;flex-direction:column;gap:10px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(34px,6vw,54px);line-height:1;margin:0;text-transform:uppercase;letter-spacing:.02em;text-wrap:balance}
+h2{font-family:var(--display);font-weight:700;font-size:30px;line-height:1.05;margin:0;text-transform:uppercase;letter-spacing:.03em;text-wrap:balance}
+h3{font-family:var(--mono);font-weight:400;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:0}
+p{margin:0;max-width:66ch}
+.lede{font-size:18px}
+.note{color:var(--dim);font-size:14px}
+.key{display:flex;flex-wrap:wrap;gap:8px 18px;font-family:var(--mono);font-size:12px;color:var(--dim)}
+.key span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:14px;border:1px solid var(--line);display:inline-block}
+section{display:flex;flex-direction:column;gap:20px;border-top:2px solid var(--ink);padding-top:20px}
+.head{display:flex;flex-direction:column;gap:8px}
+.figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;align-items:start}
+figure{margin:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+.plate{background:var(--panel);border:1px solid var(--line);padding:10px;overflow-x:auto}
+.plate svg{display:block;width:100%;height:auto}
+.wide{grid-column:1/-1}
+figcaption{font-size:14px;color:var(--dim)}
+figcaption b{color:var(--ink);font-weight:700}
+ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;max-width:66ch}
+.decide{background:var(--panel);border:1px solid var(--line);padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+/* svg classes */
+svg text{font-family:var(--mono);fill:var(--ink)}
+.t-dim{fill:var(--dim)} .t-acc{fill:var(--acc)}
+.road{fill:var(--road)} .lot{fill:var(--panel);stroke:var(--line);stroke-width:.3}
+.solid{fill:var(--fill);stroke:var(--ink);stroke-width:.35}
+.solid2{fill:var(--fill2);stroke:var(--ink);stroke-width:.35}
+.darkf{fill:var(--dark);stroke:var(--ink);stroke-width:.3}
+.litf{fill:var(--lit);stroke:var(--ink);stroke-width:.3}
+.ln{stroke:var(--ink);stroke-width:.35;fill:none}
+.thin{stroke:var(--line);stroke-width:.25;fill:none}
+.dash{stroke:var(--line);stroke-width:.3;fill:none;stroke-dasharray:1.2 1.2}
+.acc{stroke:var(--acc);stroke-width:.4;fill:none}
+.accf{fill:var(--acc);stroke:none}
+.inkf{fill:var(--ink);stroke:none}
+.none{fill:none;stroke:none}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Concrete Nocturne · wireframes for approval · 11 Oct 2026</div>
+    <h1>Districts, batch 1</h1>
+    <p class="lede">Layout drawings for the first three new districts. They show where things stand and how big they are. There are no colours, textures or lighting yet; those come after you approve the layout.</p>
+    <p class="note">Every drawing is to scale. One city block is 100 m: a 30 m road on two sides and a 62 m lot. The small orange car is the saloon, 1.9 × 4.4 m.</p>
+    <div class="key">
+      <span><i class="sw" style="background:var(--road)"></i>road</span>
+      <span><i class="sw" style="background:var(--panel)"></i>drivable paving</span>
+      <span><i class="sw" style="background:var(--fill)"></i>solid object</span>
+      <span><i class="sw" style="background:var(--dark)"></i>dark glass or window</span>
+      <span><i class="sw" style="background:var(--lit)"></i>lit</span>
+      <span><i class="sw" style="background:var(--acc)"></i>you, dimensions, the moment</span>
+    </div>
+  </header>
+
+  <section id="newtown">
+    <div class="head">
+      <div class="eyebrow">District 1 of 3</div>
+      <h2>Never Lived In</h2>
+      <p>A finished new town where no home has ever switched a light on. Every street lamp works. Tower pairs repeat, every third row of lots is still empty paving, and a lit stadium sits in the middle with nobody in it.</p>
+    </div>
+    <div class="figs">
+      <figure><h3>Whole district, 12 × 12 blocks</h3><div class="plate"><svg id="nt-district" viewBox="0 0 124 124" role="img" aria-label="District plan of Never Lived In"></svg></div>
+        <figcaption><b>Pattern:</b> tower pairs in groups of four blocks, an empty row and column between each group, a sales pavilion in every other group, and the stadium on the four centre lots.</figcaption></figure>
+      <figure><h3>One tower block, plan</h3><div class="plate"><svg id="nt-block" viewBox="-6 -6 112 112" role="img" aria-label="Plan of one tower block"></svg></div>
+        <figcaption><b>Two towers,</b> 20 × 20 m each, the same height across the whole district. Saplings in planters line the two road sides. The sign pylon stands at the road corner.</figcaption></figure>
+      <figure><h3>Street view, to scale</h3><div class="plate"><svg id="nt-elev" viewBox="-4 -6 108 150" role="img" aria-label="Street elevation of Never Lived In"></svg></div>
+        <figcaption><b>Scale:</b> the towers are 110–150 m and the lamps 7.5 m. Every window is dark all night. The ground floor is an unlit glass lobby.</figcaption></figure>
+      <figure><h3>The moment: the show flat</h3><div class="plate"><svg id="nt-moment" viewBox="-2 -2 44 22" role="img" aria-label="Show flat moment"></svg></div>
+        <figcaption><b>One lit home</b> at street level, behind a 9 m window: a table set for two, a sofa, a lamp. Nobody is in it, and nobody ever has been.</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="field">
+    <div class="head">
+      <div class="eyebrow">District 2 of 3</div>
+      <h2>Field of Blocks</h2>
+      <p>Every lot is filled with plain concrete slabs. They start at knee height by the road and rise as the ground sinks, until the walls beside you are 8.5 m and the city is gone. Nothing inside is lit except by your own headlight.</p>
+    </div>
+    <div class="figs">
+      <figure><h3>One lot, plan</h3><div class="plate"><svg id="fd-block" viewBox="-6 -6 112 112" role="img" aria-label="Plan of one Field of Blocks lot"></svg></div>
+        <figcaption><b>40 slabs</b> per lot, each 2.6 × 6.2 m, with 5 m lanes both ways. The lanes line up across the district, so from the road you can see straight down them. The second car is the moment: its headlights flash through the gaps two lanes over, keeping pace with you.</figcaption></figure>
+      <figure class="wide"><h3>Section through one lot, to scale</h3><div class="plate"><svg id="fd-section" viewBox="14 -10 102 17" role="img" aria-label="Section through a Field of Blocks lot"></svg></div>
+        <figcaption><b>Two surfaces:</b> the ground sinks up to 2.2 m and the slab tops rise to about 6.3 m above road level, so the wall beside the car reaches 8.5 m. From the road the field looks low. Slabs lean by up to 1.5°. This drawing shows the deepest kind of lot; others are shallower.</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="office">
+    <div class="head">
+      <div class="eyebrow">District 3 of 3</div>
+      <h2>Office Park</h2>
+      <p>The same low glass office on every lot, at the back, behind a painted car park with nobody parked. Some floors stay lit all night on timers. One building is dark until you come near.</p>
+    </div>
+    <div class="figs">
+      <figure><h3>One lot, plan</h3><div class="plate"><svg id="of-block" viewBox="-6 -6 112 112" role="img" aria-label="Plan of one Office Park lot"></svg></div>
+        <figcaption><b>Building</b> 44 × 16 m at the back of the lot. Two rows of painted bays you can drive straight across, two white lighting columns, and a low lit sign by the road corner. 85% of lots have no parked car; the rest have exactly one.</figcaption></figure>
+      <figure><h3>Front of the building</h3><div class="plate"><svg id="of-elev" viewBox="-3 -15 68 20" role="img" aria-label="Office elevation"></svg></div>
+        <figcaption><b>Three floors,</b> 11.4 m. Glass bands between plain panels. A lit floor shows a ceiling grid and rows of desks with no one at them.</figcaption></figure>
+      <figure class="wide"><h3>The moment: the building that notices you</h3><div class="plate"><svg id="of-moment" viewBox="0 -15 204 22" role="img" aria-label="Sensor moment sequence"></svg></div>
+        <figcaption><b>Left to right:</b> dark as you approach; within 45 m the floors switch on one by one from the bottom; after you leave they go off from the top. It's the only thing in the city that responds to you, and it's a motion sensor.</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="approve">
+    <div class="head"><h2>What I need from you</h2></div>
+    <div class="decide">
+      <p>Tell me <b>approve</b>, or name what to change in any drawing: positions, sizes, counts, or anything that should be added or removed.</p>
+      <ul>
+        <li>Never Lived In: is a third of the lots empty too many, or right?</li>
+        <li>Field of Blocks: are 5 m lanes tight enough? The car has 0.8 m to spare on each side.</li>
+        <li>Office Park: should the building sit at the back of the lot as drawn, or closer to the road?</li>
+      </ul>
+      <p class="note">The full build spec with materials, sound and code hooks is in DISTRICTS_BATCH_1.md in the project folder.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const r = (x,y,w,h,c,extra='') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" class="${c}" ${extra}/>`;
+  const l = (x1,y1,x2,y2,c) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${c}"/>`;
+  const t = (x,y,s,size=2.4,c='',anchor='start') => `<text x="${x}" y="${y}" font-size="${size}" class="${c}" text-anchor="${anchor}">${s}</text>`;
+  const ss = v => { v = Math.max(0, Math.min(1, v)); return v*v*(3-2*v); };
+
+  // shared block base: roads on two sides, lot 34..96
+  function base(labelRoads=true){
+    let s = r(0,0,100,100,'road') + r(34,34,62,62,'lot');
+    s += l(30,30,30,100,'thin') + l(30,30,100,30,'thin');
+    if (labelRoads){
+      s += t(62,17,'road, 30 m',2.6,'t-dim','middle');
+      s += `<text x="15" y="66" font-size="2.6" class="t-dim" text-anchor="middle" transform="rotate(-90 15 66)">road, 30 m</text>`;
+      s += l(34,102,96,102,'acc') + l(34,101,34,103,'acc') + l(96,101,96,103,'acc') + t(65,105.4,'lot, 62 m',2.4,'t-acc','middle');
+    }
+    return s;
+  }
+  const car = (x,y,vertical=true) => vertical ? r(x-0.95,y-2.2,1.9,4.4,'accf') : r(x-2.2,y-0.95,4.4,1.9,'accf');
+
+  /* ---------- Never Lived In ---------- */
+  (function(){
+    let s = '';
+    const u = 10, o = 2;
+    for (let li=0; li<12; li++) for (let lj=0; lj<12; lj++){
+      const x = o + li*u, y = o + lj*u;
+      s += r(x,y,u,u,'road');
+      const lx = x+3.2, ly = y+3.2, lw = 6.4;
+      const stadium = (li===6||li===7) && (lj===6||lj===7);
+      const empty = (li%3===2 || lj%3===2);
+      if (stadium) { s += r(lx,ly,lw,lw,'solid2'); }
+      else if (empty) { s += r(lx,ly,lw,lw,'lot'); }
+      else {
+        s += r(lx,ly,lw,lw,'lot');
+        const sales = (li%6===1 && lj%3===1);
+        if (sales) { s += r(lx+1,ly+0.8,4.4,1.6,'litf'); s += r(lx+0.9,ly+3.4,2,2,'darkf') + r(lx+3.5,ly+3.4,2,2,'darkf'); }
+        else { s += r(lx+0.9,ly+2.2,2,2,'darkf') + r(lx+3.5,ly+2.2,2,2,'darkf'); }
+      }
+    }
+    s += `<ellipse cx="${o+70+1.6}" cy="${o+70+1.6}" rx="4.2" ry="3" class="litf"/>`;
+    s += t(o+71.6,o+62.6,'stadium',2.2,'','middle');
+    $('nt-district').innerHTML = s;
+
+    // block plan
+    let b = base();
+    b += r(41,41,48,48,'dash');
+    b += r(43,55,20,20,'darkf') + r(67,55,20,20,'darkf');
+    b += t(53,66,'tower',2.4,'','middle').replace('class=""','style="fill:var(--paper)"') ;
+    b += t(77,66,'tower',2.4,'','middle').replace('class=""','style="fill:var(--paper)"');
+    for (let q=40; q<96; q+=9){ b += `<circle cx="${q}" cy="35.6" r="0.9" class="solid"/>` + `<circle cx="35.6" cy="${q}" r="0.9" class="solid"/>`; }
+    b += r(37.3,37.3,1.4,1.4,'inkf') + t(40,39.6,'sign pylon',2.2,'t-dim');
+    b += t(65,46,'building area, 48 m',2.2,'t-dim','middle');
+    b += t(65,33,'saplings every 9 m',2.2,'t-dim','middle');
+    b += l(43,78,63,78,'acc') + t(53,81,'20 m',2.2,'t-acc','middle');
+    b += car(15,88);
+    $('nt-block').innerHTML = b;
+
+    // elevation
+    let e = l(0,130,100,130,'ln');
+    const tw = (x,h) => {
+      let q = r(x,130-h,20,h-6,'solid') + r(x,124,20,6,'darkf');
+      for (let yy=130-h+3; yy<122; yy+=4) for (let xx=x+1.5; xx<x+19; xx+=2.5) q += r(xx,yy,1.5,2.2,'darkf');
+      return q;
+    };
+    e += tw(26,128) + tw(54,128);
+    for (const x of [6,20,84,96]) { e += l(x,130,x,122.5,'ln') + l(x,122.5,x+2,122.5,'ln') + `<circle cx="${x+2}" cy="122.9" r="0.7" class="litf"/>`; }
+    for (const x of [10,14,88,92]) { e += r(x-0.6,129.5,1.2,0.5,'solid') + l(x,129.5,x,127.2,'ln') + r(x-0.5,126.4,1,1,'solid2'); }
+    e += l(80,2,80,130,'acc') + l(79,2,81,2,'acc') + l(79,130,81,130,'acc');
+    e += `<text x="83" y="66" font-size="3" class="t-acc" transform="rotate(-90 83 66)" text-anchor="middle">128 m</text>`;
+    e += r(2,128.6,4.4,1.4,'accf');
+    e += t(50,136,'every lamp on · every window dark',3,'t-dim','middle');
+    e += l(46,127,50,127,'thin') + t(50,140.5,'ground floor: unlit glass lobby',2.6,'t-dim','middle');
+    $('nt-elev').innerHTML = e;
+
+    // show flat
+    let m = r(0,0,40,14,'darkf') + l(0,14,40,14,'ln');
+    m += r(4,4.2,18,6.4,'litf');
+    m += l(13,4.2,13,5.6,'ln') + `<circle cx="13" cy="6" r="0.5" class="solid2"/>`;
+    m += r(10.6,8.4,4.8,0.4,'solid2') + l(11.2,8.8,11.2,10.6,'ln') + l(14.8,8.8,14.8,10.6,'ln');
+    m += r(9,8.6,1,2,'solid2') + r(16,8.6,1,2,'solid2');
+    m += r(17.6,8.8,3.4,1.8,'solid2') + r(5,7.4,0.4,3.2,'solid2') + r(4.5,6.6,1.4,0.9,'solid2');
+    m += r(22.6,9,2.6,1.2,'solid') + t(23.9,9.9,'SHOW FLAT',0.5,'','middle');
+    m += l(4,16,22,16,'acc') + l(4,15.4,4,16.6,'acc') + l(22,15.4,22,16.6,'acc') + t(13,18.2,'9 m window, table set for two',1.5,'t-acc','middle');
+    m += t(31,7.4,'dark lobby glass',1.4,'','middle').replace('class=""','style="fill:var(--paper)"');
+    $('nt-moment').innerHTML = m;
+  })();
+
+  /* ---------- Field of Blocks ---------- */
+  (function(){
+    let b = base();
+    const xs = [], zs = [];
+    for (let k=0;k<8;k++) xs.push(34+3.1+k*7.6);
+    for (let k=0;k<5;k++) zs.push(34+5.5+k*11.2);
+    for (const x of xs) for (const z of zs) {
+      const d = Math.min(x+1.3-34, 96-(x+1.3), z+3.1-34, 96-(z+3.1)) / 31;
+      b += r(x,z,2.6,6.2, ss(d) > 0.45 ? 'solid2' : 'solid');
+    }
+    const laneX = xs[3]+2.6+2.5, laneX2 = xs[5]+2.6+2.5;
+    b += car(laneX,72) + `<path d="M ${laneX} 69 L ${laneX} 60" class="acc" marker-end="none"/>`;
+    b += r(laneX2-0.95,70-2.2,1.9,4.4,'solid') + `<circle cx="${laneX2-0.5}" cy="67.4" r="0.45" class="litf"/><circle cx="${laneX2+0.5}" cy="67.4" r="0.45" class="litf"/>`;
+    b += l(laneX2,72.4,laneX2,97.5,'acc') + t(laneX2,100.2,'the other car',2.1,'t-acc','middle');
+    b += l(xs[0]+2.6,99,xs[1],99,'acc') + t(xs[0]+5.1,98.2,'5 m',2,'t-acc','middle');
+    b += t(65,32.6,'lanes line up across the district',2.2,'t-dim','middle');
+    b += t(5,96,'darker = taller',2.2,'t-dim');
+    $('fd-block').innerHTML = b;
+
+    // section, y up => svg y = -height
+    let s = '';
+    s += r(14,0,20,0.5,'road') + r(96,0,20,0.5,'road');
+    // ground curve
+    let path = 'M 14 0 L 34 0';
+    for (let x=34; x<=96; x+=1) { const d = Math.min(x-34, 96-x); const sv = ss((d-4)/27); path += ` L ${x} ${(2.2*sv).toFixed(2)}`; }
+    path += ' L 116 0';
+    s += `<path d="${path} L 116 5 L 14 5 Z" class="solid"/>`;
+    s += l(14,0,116,0,'dash');
+    const lean = [0.1,-0.12,0.15,0,-0.1,0.14,0,-0.13];
+    for (let k=0;k<8;k++){
+      const x = 34+3.1+k*7.6, cx = x+1.3, d = Math.min(cx-34, 96-cx), sv = ss((d-4)/27), g = 2.2*sv, top = 0.9+5.4*sv, sh = lean[k]*(top+g)/8.5*2;
+      s += `<path d="M ${x} ${g} L ${x+sh} ${-top} L ${x+2.6+sh} ${-top} L ${x+2.6} ${g} Z" class="solid2"/>`;
+    }
+    const cxm = 34+3.1+3*7.6+2.6+2.5, gm = 2.2;
+    s += r(cxm-0.95,gm-1.4,1.9,1.4,'accf');
+    s += r(22,-1.4,1.9,1.4,'accf') + t(23,-2,'you, on the road',1.3,'t-acc','middle');
+    // dims
+    const dx = 34+3.1+4*7.6+2.6+1.2;
+    s += l(dx,2.2,dx,-6.3,'acc') + l(dx-0.5,2.2,dx+0.5,2.2,'acc') + l(dx-0.5,-6.3,dx+0.5,-6.3,'acc') + `<text x="${dx-0.7}" y="-2" font-size="1.15" class="t-acc" text-anchor="middle" transform="rotate(-90 ${dx-0.7} -2)">8.5 m wall</text>`;
+    s += t(98,-0.5,'road level',1.2,'t-dim');
+    s += t(65,4.2,'ground sinks 2.2 m at the centre',1.3,'','middle');
+    s += t(65,-7.6,'slab tops reach 6.3 m above road level',1.3,'t-dim','middle');
+    s += t(34,-3.6,'0.9 m at the edge',1.2,'t-dim') + l(38.5,-3.2,38.5,-1.1,'thin');
+    $('fd-section').innerHTML = s;
+  })();
+
+  /* ---------- Office Park ---------- */
+  (function(){
+    let b = base();
+    b += r(43,74,44,16,'solid2') + t(65,83,'office, 3 floors',2.4,'','middle');
+    b += r(62,71,6,3,'solid') + t(65,70,'canopy',2,'t-dim','middle');
+    for (const z0 of [44,56]) for (let x=43; x<=87; x+=2.5) b += l(x,z0,x,z0+5,'thin');
+    b += t(65,54.2,'6 m aisle',2,'t-dim','middle');
+    b += `<circle cx="91" cy="46.5" r="0.8" class="litf"/><circle cx="91" cy="58.5" r="0.8" class="litf"/>` + t(92.4,53,'lights',1.9,'t-dim');
+    b += r(36.5,37.4,4,1.1,'litf') + t(42,38.6,'sign',2,'t-dim');
+    b += r(81.6,56.3,1.9,4.4,'solid') + t(79.5,64,'one car, 15% of lots',1.9,'t-dim','end');
+    b += l(43,92.5,87,92.5,'acc') + t(65,95.4,'44 m',2.2,'t-acc','middle');
+    b += car(15,88);
+    b += t(65,42,'painted bays, drivable',2.1,'t-dim','middle');
+    $('of-block').innerHTML = b;
+
+    const facade = (x0, lit) => {
+      let s = '';
+      let y = 0;
+      const bands = [['p',1.4],['g',2.4,lit[0]],['p',1.4],['g',2.4,lit[1]],['p',1.4],['g',2.4,lit[2]]];
+      // draw from ground up: floor1 glass sits above base? order bottom→top: glass1, panel, glass2, panel, glass3, panel
+      const order = [['g',2.4,lit[0]],['p',1.4],['g',2.4,lit[1]],['p',1.4],['g',2.4,lit[2]],['p',1.4]];
+      for (const o of order){
+        y -= o[1];
+        if (o[0]==='p') s += r(x0,y,44,o[1],'solid');
+        else {
+          s += r(x0,y,44,o[1], o[2] ? 'litf' : 'darkf');
+          if (o[2]) { for (let xx=x0+2; xx<x0+43; xx+=3) s += r(xx,y+1.5,1.8,0.5,'solid2') + l(xx-0.4,y+0.35,xx+2.2,y+0.35,'thin'); }
+        }
+      }
+      return s;
+    };
+    let e = l(-3,0,65,0,'ln') + facade(8,[true,false,true]);
+    e += r(27,-3.2,6,0.3,'solid2') + l(27.5,-2.9,27.5,0,'ln') + l(32.5,-2.9,32.5,0,'ln');
+    e += l(55,0,55,-11.4,'acc') + l(54.5,-11.4,55.5,-11.4,'acc') + t(56,-5.4,'11.4 m',1.5,'t-acc');
+    e += r(1,-1.4,4.4,1.4,'accf');
+    e += t(30,2.4,'floor 2 dark · floors 1 and 3 lit on timers',1.5,'t-dim','middle');
+    $('of-elev').innerHTML = e;
+
+    let m = l(0,0,204,0,'ln');
+    const states = [[false,false,false,'1 · you approach: all dark'],[true,true,false,'2 · within 45 m: on, floor by floor'],[false,false,false,'3 · after you leave: off, top first']];
+    states.forEach((st,k) => {
+      const x0 = 12 + k*66;
+      m += facade(x0, k===2 ? [true,false,false] : st.slice(0,3));
+      m += t(x0+22,3.4,st[3],2.4,'','middle');
+      const cx = k===0 ? x0-9 : k===1 ? x0+20 : x0+50;
+      m += r(cx,-1.4,4.4,1.4,'accf');
+    });
+    $('of-moment').innerHTML = m;
+  })();
+})();
+</script>
