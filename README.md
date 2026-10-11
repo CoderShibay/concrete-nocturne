@@ -2,8 +2,8 @@
 
 A night drive through an endless brutalist city that is alive for everyone except you.
 Towers too tall to see the top of, sodium lamps in a blue-black sky, windows going out one by one,
-and a car radio playing cold post-punk to one person. It is not horror. Now and then a lone car
-runs ahead of you, and when you catch it nobody is inside; the city is simply not for you.
+and a car radio playing cold post-punk to one person. It is not horror and nothing chases you;
+the city is simply not for you.
 
 - **Play online:** https://claude.ai/artifact/S4u6tWkfTZSLWjMYihDWFX (private artifact)
 - **Play locally:** run `./build-play.sh`, then open `play.html` in a browser
@@ -37,28 +37,6 @@ The city is endless and built block by block around the car (100 m blocks with 3
 12×12 blocks to a district, so each zone lasts about 30–50 seconds of driving). Buildings stand 7 m back
 inside their lots, so there is a drivable apron of paving around them, and empty lots are open ground.
 
-**Structures:** a low metro line runs over the road of every seventh row and a high line over every ninth
-column, with long lit trains. You can land the spaceship on a moving train and ride it.
-
-- **Expressways.** Most districts lift one road onto an elevated expressway: 130 m ramps up to a deck 16 m
-  high and 18 m wide, on single T-piers, running 0.6–1 km over several junctions under sodium lamps. The
-  outer lanes stay at street level underneath. Green signs hang on the deck's face over each junction.
-- **Sunken underpasses.** Many districts drop one road into a tunnel: 80 m open ramps down to 7.5 m, then a
-  lit, covered tunnel under two or three junctions. The outer lanes and the road on top stay at street level.
-- **Multi-storey car parks** fill a whole lot: four open decks on an 18 m column grid, straight two-way ramps
-  that wind up the two sides, parked cars on every level, lamps on the open roof.
-- **Underground car parks** fill the ground under a whole lot: a 10 m ramp beside the road drops into one
-  wide, low room with 20 m between columns, strip lights and a few parked cars.
-- Some towers stand on a few great columns (about 20 m apart, 9 m headroom) that you can drive straight
-  through; some buildings bridge a road on four piers over a lit hall 14 m high; lit footbridges cross others.
-- There is exactly one gas station in the whole city, on the first road you drive. The first road also
-  takes you up the first expressway, past a car park; the first tunnel crosses under it.
-
-The maps show expressways as pale lines and tunnels as dashed ones.
-
-**The chase:** every couple of minutes a lone car appears ahead and drives off through the city. It waits if
-you fall back and runs if you close in; it shows as a red dot on the map. Stay right behind it for a moment
-and it pulls over, its lights go out, and nobody is inside.
 A small **director** decides what each new district becomes and when something happens.
 
 **Zones.** Each district gets one zone the first time it comes into view. The district you are driving
