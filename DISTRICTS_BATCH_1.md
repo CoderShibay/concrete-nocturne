@@ -177,17 +177,23 @@ The 62 m lot is filled edge to edge; this zone has no apron.
  ═════╧═══███═█████═█████═█████═█████═█████═█████═█████═█████═███══════╧═════
           0.9 m at the edge  →  car roof is 1.4 m  →  city gone by the 3rd row
 ```
-- **Height of a block:** `h = 0.9 + (hMax − 0.9) · s · w + jitter`
+- **Two surfaces, as at the Berlin field:** the ground sinks while the tops rise more gently. From the road it looks like a low field; inside, the walls are deep.
+  - Ground: `g = −2.2 · s · w` m (0 at the lot edge, down to −2.2 m at the centre of the deepest lots).
+  - Slab top, measured from road level: `top = 0.9 + 5.4 · s · w + jitter` (max about 6.3 m above the road).
+  - Wall beside the car = `top − g`: up to **8.5 m**.
+- **The formula's terms:**
   - `s`: 0 at the lot edge, 1 at the lot centre (smoothstep on distance to the nearest edge / 31 m).
   - `w`: the district "swell", 0.35…1.0, a slow sine across the district, so some lots are shallow (max about 3.5 m) and some are deep.
   - `jitter`: ±0.25 m per block.
-  - `hMax` = **8.5 m** (decided: deep).
-- No block is under 0.9 m, so every block is solid to the car (`y1 ≥ 0.6`).
+  - Deepest wall = **8.5 m** (decided: deep), made of 6.3 m above road level plus the 2.2 m dip.
+- No slab top is under 0.9 m above its own ground, so every slab is solid to the car.
 
 ### Build list (`genCell`, zone `field`)
 | Element | Detail |
 |---|---|
-| Blocks | 40 `addBox` calls per lot into one bucket, each with a `solids` entry (`y0: 0, y1: h`) |
+| Blocks | 40 slabs per lot into one bucket. Each stands on the dipped ground (base at `g`, top at `top`) and has a `solids` entry (`y0: g, y1: top`) that stays upright. |
+| Tilt | see "Tilt and dip" below |
+| Lot surface | a 17×17 grid mesh over the 62 m lot, displaced by `g`, in the same paving material as the other lots |
 | Material | new `stele`: MeshStandard `0x2c2e32`, roughness .82, no texture noise. Smoother and slightly bluer than `concrete`, so it reads as a different, deliberate object. |
 | Tower/plinth | none; no `tower()` calls. The skyline is whatever the neighbouring districts show. |
 | Lamps | on the roads only, `lampOn = 0.5`. **Nothing** inside the lots. |
@@ -220,21 +226,54 @@ Someone else is in the field, one lane over.
 - No caption.
 
 ### Atmosphere while inside a lot
-Driven by `depth` = local block height at the car's position ÷ `hMax`, 0…1, smoothed over 0.6 s:
+Driven by `depth` = wall height beside the car (`top − g`) ÷ 8.5, 0…1, smoothed over 0.6 s:
 - **Radio:** tape filter 2000 → `2000 − 1500·depth` Hz; music gain × `(1 − 0.5·depth)`.
 - **Rain sound:** gain × `(1 − 0.6·depth)`.
 - **Engine filter:** 400 → `400 − 200·depth` Hz.
 - **Rain streaks:** unchanged.
 - All of it returns to normal within about 1.5 s of leaving.
 
+### Tilt and dip (decided 2026-10-11: both, done tastefully)
+
+Both must be subtle. The player should feel them without being able to point at them.
+
+**Tilt**
+- Each slab leans by at most **1.5°**, about a random horizontal axis. About 30% of slabs stay perfectly upright.
+- Neighbours lean in related directions: take the lean from a smooth noise field over the district, not an independent random number per slab. It should read as ground that has settled, not as jitter.
+- Simplest build: shear the slab. Shift its four top vertices sideways by `height · tan(angle)`, at most 0.22 m at the tallest slab. The base stays where it is.
+- Collision boxes stay upright and unchanged. The mismatch is under 0.25 m at the top, well above the car.
+- No slab leans far enough to narrow a lane below 4.6 m at car height.
+
+**Dip**
+- The lot surface follows `g`: a smooth bowl, 0 at the edge and at most −2.2 m at the centre, scaled by the district swell `w`, so shallow lots barely sink.
+- The first 4 m inside the lot edge is flat, with no kerb, lip or seam where the lot meets the sidewalk.
+- Maximum slope **7%**. Slope is zero at the edge and at the centre (use smoothstep), so there is no crest or kink.
+- The car follows the ground:
+  - `car.pos.y = groundAt(x, z)`, which returns 0 everywhere except inside field lots.
+  - The car pitches and rolls to the slope, smoothed over 0.25 s.
+  - No gravity, no speed change on slopes, no bounce.
+- Everything attached to the car follows it down: the camera, headlight, trails (`groundY`), rain and the `pacer` car.
+- The chase camera keeps its usual height above the car and must not bob. Smooth its y over 0.4 s.
+- Ground collision compares solids to the car's own height, not to 0: `b.y0 > car.pos.y + 1.5 || b.y1 < car.pos.y + 0.6`.
+- Drawing it: the world ground is one flat 2.4 km plane (`:1822`), which would cover a sunken lot. Recommended:
+  - Add a small mask texture to the ground material (one texel per cell around the car, set for field cells).
+  - Discard the ground's pixels inside the lot rectangle of masked cells.
+  - Draw the displaced lot mesh from the build list in their place.
+  - An equivalent method is fine if it leaves no seam.
+- The removed version `6891eef` had a `groundAt(x, z, cy)` for bridges and underpasses. Read it for reference, but build only this smooth bowl: no ramps, barriers or multi-level surfaces.
+- Spaceship: unchanged. Its floor stays at road level.
+
+**If the dip misbehaves:** ship the tilt alone and leave `g = 0`. Every other number in this section still works on flat ground. The walls are then 6.3 m; raise the top formula's 5.4 to 7.6 to restore 8.5 m.
+
 ### Known limits
-- **Ground dip:** not possible; the ground is one flat plane. Skip it.
-- **Tilted slabs:** skip; `addBox` is axis-aligned.
 - **Spaceship:** it flies over the field and sees the whole wave pattern from above. That's a bonus.
 - **Speed:** at high speed you'll glance off slabs. That's intended: the zone slows you down.
 
 ### Acceptance
 - [ ] Driving into a deep lot at 40 km/h, the surrounding towers are hidden by the third row.
+- [ ] From the road the field looks low (tops about 6 m at most), and there is no visible edge where the lot starts to sink.
+- [ ] Driving in and out at 80 km/h, the camera doesn't bob and the car doesn't hop.
+- [ ] The lean is only noticeable when you look down a long lane: the tops don't line up.
 - [ ] The car fits every lane without scraping when driven straight.
 - [ ] From the road you can see down a lane to the far side.
 - [ ] The audio muffles on the way in and recovers on the way out.
@@ -331,7 +370,12 @@ The building that notices you.
 1. **Headlight:** it's needed by `field` and improves every zone. Check it in the existing zones first: it must not wash out the sodium pools or light the towers above their bases.
 2. **`office`:** the simplest; it adds the `panel`, `glassDark` and `officeLit` materials.
 3. **`newtown`:** reuses `glassDark`; adds `winDead`, the stadium and the show flat.
-4. **`field`:** adds `stele`, the `pacer` moment and the audio muffling.
+4. **`field`:** adds `stele`, the `pacer` moment and the audio muffling. Build it in three commits:
+   1. flat and upright
+   2. the tilt
+   3. the dip
+
+   That way the dip can be backed out on its own.
 5. Add all three to `ZONES`, `ZONE_NAMES`, `MOMENT_FOR` and `ZONE_TINT`, in the order given in §0.
 6. Screenshot each zone at night and by day (`tools/shoot.js`), from the road and from inside a lot. Commit and push per zone.
 
