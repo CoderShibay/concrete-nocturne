@@ -2882,9 +2882,6 @@ try {
 } catch (err) { composer = null; }
 
 /* ---------- lo-fi radio (all generated live) ---------- */
-// Levels of the district sounds. They are set by measurement (node tools/measure-audio.js <zone>), not by ear or
-// from a spec: an ambience should sit about as loud as the rain, 8 to 10 dB under the music.
-const MIX = { tv: 0.34, tvCourt: 0.5, ac: 0.0155, wind: 0.02, port: 0.02, hum: 0.015 };
 const radio = {
   ctx: null, musicOn: true, rainOn: true,
   init() {
@@ -3014,7 +3011,7 @@ const radio = {
       src.connect(bq); bq.connect(am); am.connect(this.densG); src.start(0, Math.random());
     }
     this.acG = ctx.createGain(); this.acG.gain.value = 0; this.acG.connect(comp);
-    for (const [f, lv] of [[120, 1], [240, 0.5], [360, 0.25]]) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; g.gain.value = lv; o.connect(g); g.connect(this.acG); o.start(); }   // with partials a small speaker can play
+    { const o = ctx.createOscillator(); o.frequency.value = 120; o.connect(this.acG); o.start(); }
 
     // Coming Soon: wind through the opened buildings, slowly swelling
     this.windG = ctx.createGain(); this.windG.gain.value = 0; this.windG.connect(comp);
@@ -3290,12 +3287,12 @@ const radio = {
     // Field of Blocks (depth): as the walls rise beside you the radio, the rain and the engine all muffle.
     if (!this.ctx) return; const t = this.ctx.currentTime; this.depth = depth;
     this.tape.frequency.setTargetAtTime(2000 + 2800 * clean - 1500 * depth, t, 0.15); this.crackG.gain.setTargetAtTime(0.22 * (1 - 0.5 * clean), t, 0.15);
-    this.duck.gain.setTargetAtTime((1 - 0.5 * depth) * (1 - 0.3 * zm.port) * (1 - 0.25 * zm.density), t, 0.15);   // in the Port and in Density Wall something is always louder than the radio
+    this.duck.gain.setTargetAtTime((1 - 0.5 * depth) * (1 - 0.3 * zm.port), t, 0.15);          // in the Port something is always louder than the radio
     if (!this.full) return;
     this.rainDuck.gain.setTargetAtTime(1 - 0.6 * depth, t, 0.15);
     this.portG.gain.setTargetAtTime(0.02 * zm.port, t, 0.15); this.windG.gain.setTargetAtTime(0.02 * zm.soon, t, 0.15);   // 0.02 × a swell of 0.2 to 1 averages the 0.012 asked for
-    this.densG.gain.setTargetAtTime((MIX.tv + (MIX.tvCourt - MIX.tv) * zm.court) * zm.density, t, 0.15); this.rainDuck.gain.setTargetAtTime((1 - 0.6 * depth) * (1 - 0.3 * zm.court), t, 0.15);   // in a courtyard the murmur closes in and the rain backs off
-    this.acG.gain.setTargetAtTime(MIX.ac * zm.density, t, 0.15);
+    this.densG.gain.setTargetAtTime((0.02 + 0.015 * zm.court) * zm.density, t, 0.15); this.rainDuck.gain.setTargetAtTime((1 - 0.6 * depth) * (1 - 0.3 * zm.court), t, 0.15);   // in a courtyard the murmur closes in and the rain backs off
+    this.acG.gain.setTargetAtTime(0.01 * zm.density, t, 0.15);
   },
   songNote(n, vol, pan) { // one note of someone else's song, from a room you can't reach: a soft sine, far off
     if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
