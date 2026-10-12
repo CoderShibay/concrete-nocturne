@@ -3382,7 +3382,7 @@ function setDay(d) {
   for (let k = 0; k < 5; k++) mats['box' + k].emissiveIntensity = d ? 0 : BOX_LIT;
   mats.hull.emissiveIntensity = mats.hullRed.emissiveIntensity = d ? 0 : HULL_LIT;
   mats.glowp.opacity = d ? 0.3 : PITCH; mats.standlit.color.setHex(d ? 0x5c5e5d : STAND_LIT);   // by day the pitch is only its lines, the stands plain concrete
-  PAPERS.forEach((c, k) => mats['paper' + k].color.setHex(c).multiplyScalar(d ? 2.3 : 1));
+  PAPERS.forEach((c, k) => mats['paper' + k].color.setHex(c).multiplyScalar(d ? 1.6 : 1));
   mats.flood.color.setHex(d ? 0x9a9c98 : FLOOD); floodHalo.visible = !d;   // no light pools on the road in daylight
   if (bloom) bloom.threshold = L.bloomT;
   ground.material.color.setHex(d ? 0x8c8c8c : 0xffffff);          // tame the asphalt speckle in full daylight
