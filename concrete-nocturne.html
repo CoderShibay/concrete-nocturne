@@ -1128,7 +1128,7 @@ function windowMaterial(variant, seed, litAmt = 0.4, base = null, clean = !!base
   for (const t of [tm, te, to]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso; }
   const mat = new THREE.MeshStandardMaterial({ map: tm, emissiveMap: te, emissive: 0xffffff, emissiveIntensity: 1.0, roughness: 0.92, metalness: 0 });
   let ttv = null; if (tv) { ttv = new THREE.CanvasTexture(tv); ttv.wrapS = ttv.wrapT = THREE.RepeatWrapping; }
-  if (dense) mat.emissiveIntensity = 0.7;                       // so many lit windows together: dimmed so they keep their colour under bloom
+  if (dense) mat.emissiveIntensity = 0.85;                      // so many lit windows together: dimmed so they keep their colour under bloom
   nightWindows(mat, to, dense ? NIGHT_DENSE : NIGHT, ttv);
   return mat;
 }
