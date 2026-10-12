@@ -2864,7 +2864,7 @@ try {
 /* ---------- lo-fi radio (all generated live) ---------- */
 // Levels of the district sounds. They are set by measurement (node tools/measure-audio.js <zone>), not by ear or
 // from a spec: an ambience should sit about as loud as the rain, 8 to 10 dB under the music.
-const MIX = { tv: 0.34, tvCourt: 0.5, ac: 0.0155, wind: 0.19, port: 0.02, hum: 0.015 };
+const MIX = { tv: 0.34, tvCourt: 0.5, ac: 0.0155, wind: 0.19, port: 0.0179, hum: 0.015 };
 const radio = {
   ctx: null, musicOn: true, rainOn: true,
   init() {
@@ -2980,9 +2980,10 @@ const radio = {
 
     // The Port: a low machinery drone and a slow whine, always on somewhere behind the stacks
     this.portG = ctx.createGain(); this.portG.gain.value = 0; this.portG.connect(comp);
-    for (const f of [55, 82]) { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(this.portG); o.start(); }
+    this.clankG = ctx.createGain(); this.clankG.connect(comp); this.clankG.connect(this.rev);   // the clanks' own control, so they can be measured
+    for (const f of [55, 82, 110, 165]) { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(this.portG); o.start(); }   // the upper two are what a small speaker can play
     { const o = ctx.createOscillator(), g = ctx.createGain(), sweep = ctx.createOscillator(), sg = ctx.createGain();
-      o.frequency.value = 750; g.gain.value = 0.3; sweep.frequency.value = 1 / 8; sg.gain.value = 150;
+      o.frequency.value = 750; g.gain.value = 1.0; sweep.frequency.value = 1 / 8; sg.gain.value = 150;
       sweep.connect(sg); sg.connect(o.frequency); o.connect(g); g.connect(this.portG); o.start(); sweep.start(); }
 
     // Density Wall: a murmur of televisions (two bands of noise, each rising and falling at the rate of speech) and
@@ -3259,10 +3260,10 @@ const radio = {
     if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, s2 = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null, o = ctx.createOscillator(), og = ctx.createGain();
     s2.buffer = this.noise; f.type = 'bandpass'; f.frequency.value = 700 + Math.random() * 500; f.Q.value = 2.5;
-    g.gain.setValueAtTime(0.09 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    g.gain.setValueAtTime(0.42 * v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);   // peaks at about -20 dB
     o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(60, t + 0.25); og.gain.setValueAtTime(0.12 * v, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
     s2.connect(f); f.connect(g); o.connect(og); og.connect(g);
-    if (p) { p.pan.value = pan; g.connect(p); p.connect(this.comp); p.connect(this.rev); } else { g.connect(this.comp); g.connect(this.rev); }
+    if (p) { p.pan.value = pan; g.connect(p); p.connect(this.clankG); } else g.connect(this.clankG);
     s2.start(t, Math.random()); s2.stop(t + 0.5); o.start(t); o.stop(t + 0.35);
   },
   atmos(clean, depth, zm) {
@@ -3273,7 +3274,7 @@ const radio = {
     this.duck.gain.setTargetAtTime((1 - 0.5 * depth) * (1 - 0.3 * zm.port) * (1 - 0.25 * zm.density) * (1 - 0.2 * zm.soon - 0.2 * zm.song), t, 0.15);   // in the Port and in Density Wall something is always louder than the radio; in Coming Soon it gives way to the wind, and to the other song near the lit room
     if (!this.full) return;
     this.rainDuck.gain.setTargetAtTime(1 - 0.6 * depth, t, 0.15);
-    this.portG.gain.setTargetAtTime(0.02 * zm.port, t, 0.15); this.windG.gain.setTargetAtTime(MIX.wind * zm.soon, t, 0.15);   // the level at the top of its swell
+    this.portG.gain.setTargetAtTime(MIX.port * zm.port, t, 0.15); this.windG.gain.setTargetAtTime(MIX.wind * zm.soon, t, 0.15);   // the level at the top of its swell
     this.densG.gain.setTargetAtTime((MIX.tv + (MIX.tvCourt - MIX.tv) * zm.court) * zm.density, t, 0.15); this.rainDuck.gain.setTargetAtTime((1 - 0.6 * depth) * (1 - 0.3 * zm.court), t, 0.15);   // in a courtyard the murmur closes in and the rain backs off
     this.acG.gain.setTargetAtTime(MIX.ac * zm.density, t, 0.15);
   },
