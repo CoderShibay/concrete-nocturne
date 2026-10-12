@@ -54,8 +54,11 @@ Zones are remembered, so driving back shows the same blocks.
 | Plaza | Empty, fenced ground; one monument lost in the haze |
 | Field of Blocks | Every lot filled with plain concrete slabs that rise as the ground sinks, until the walls beside you are about 8.5 m and the city is gone; the radio, rain and engine muffle as you go in |
 | Interchange | Elevated roads overhead that come out of one portal and go into another; green signs to places you never reach; parked cars with nobody in them |
+| The Port | A container terminal that runs all night with nobody visible: coloured stacks you can drive between, gantry cranes working on their own, and one dock basin with a moored ship |
 | Residential Wall | Housing slabs, most windows dark; sometimes a locked gate in front of a lit courtyard |
+| Density Wall | Hollow blocks 200 m tall that fill their lots, windows 2 m apart and most of them lit all night; on every other block a gate into the courtyard |
 | Corner | The ordinary city at human scale; the only street-level neon, often half dead or blinking OPEN |
+| Coming Soon | An old four-storey neighbourhood being demolished in three bands: terraces still lived in, terraces cut open with their rooms showing, then cleared ground, billboards and one finished glass tower |
 | Fog Edge | Low and sparse; the fog closes in around you and lifts when you leave |
 
 **Moments.** Every 30–50 seconds, one small sign of other people, never for you, placed in the block
@@ -70,8 +73,11 @@ about to appear ahead. It only counts once you have passed it; turn away and it 
 | Plaza | A lone lamp, a bench, and a statue's long shadow across the square |
 | Field of Blocks | Another car two lanes over, keeping pace; its light slides behind the slabs, then it stops and goes dark |
 | Interchange | A lit, empty train crossing a high line ahead, then its horn |
+| The Port | A crane lifts a container, carries it out over the road above you, holds it there, and takes it back |
 | Residential Wall | A figure crossing a lit window; below, a lit bus stop with nobody waiting |
+| Density Wall | The same television in a hundred rooms: dozens of windows flicker in unison for six seconds, then stop |
 | Corner | A green-lit diner with one figure's back to you; a payphone ringing as you pass |
+| Coming Soon | One cut-open room on the third floor still has its lamp on; the radio picks up another song from it |
 | Fog Edge | The lamps go out one by one just after you pass under them |
 | (anywhere) | Another car's tail lights far ahead, pacing you, then gone |
 
@@ -106,8 +112,9 @@ Codex and AGY, each built from the same palette.
 | `play.html` | Generated; gitignored. Edit the source and rebuild. |
 | `play-test.html` | Generated test copy that exposes internals as `window.__cn`; gitignored. |
 | `LONELY_CITY_BRIEF.md` | The design brief the city is built from. |
-| `DISTRICT_CONCEPTS.md` | Twelve district ideas drawn from the research. Three are built (see below); nine are not. |
+| `DISTRICT_CONCEPTS.md` | Twelve district ideas drawn from the research. Six are built (see below); six are not. |
 | `DISTRICTS_BATCH_1.md`, `wireframes/batch-1.html` | The build spec and approved layout drawings for Office Park, Never Lived In and Field of Blocks. |
+| `DISTRICTS_BATCH_2.md`, `wireframes/batch-2.html` | The same for the Port, Density Wall and Coming Soon. |
 | `ships/SHIP_DESIGN_SPEC.md` | The brief and code contract for the spaceship designs. |
 | `ships/codex-ships.js`, `ships/agy-ships.js` | Three ships each by Codex and AGY, embedded in the game unchanged. |
 | `autotest.html` | Generated headless-test copy; gitignored. |
