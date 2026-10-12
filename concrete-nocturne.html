@@ -1062,7 +1062,7 @@ function radialTex(inner, outer, size = 128) {
 const NIGHT = { value: 1 };
 // Density Wall keeps its own count: its windows stay mostly lit all night (NIGHT_DENSE never falls below 0.55).
 // Its low floors don't go dark first, as they do elsewhere. TV is one shared level for the televisions in its windows, so every facade in view flickers in unison.
-const NIGHT_DENSE = { value: 1 }, TV = { value: 0 };
+const NIGHT_DENSE = { value: 1 }, TV = { value: 0 }, tvFlicker = { until: 0, next: 0 };   // tvFlicker: the moment, running until that time
 function nightWindows(mat, offTex, lit = NIGHT, tvTex = null) {
   mat.customProgramCacheKey = () => 'nightWindows' + (tvTex ? '-tv' : '');   // the two variants compile to different shaders and must not share one
   mat.onBeforeCompile = sh => {
@@ -1380,7 +1380,7 @@ const director = { distanceDriven: 0, driveTime: 0, sinceLastMoment: 0, nextGap:
 // Moments: one small sign of other people at a time, 30–50 s apart (the rhythm). A moment is placed in the block
 // that is about to appear ahead of the car; it only counts once the car has actually passed it.
 const moments = { pending: false, active: null, cache: new Map(), lingering: [] };
-const MOMENT_FOR = { port: 'lift', corridor: 'bridge', office: 'sensor', boulevard: 'window', newtown: 'showflat', plaza: 'lamp', field: 'pacer', interchange: 'train', residential: 'silhouette', corner: 'diner', fog: 'lampsOff' };
+const MOMENT_FOR = { port: 'lift', density: 'flicker', corridor: 'bridge', office: 'sensor', boulevard: 'window', newtown: 'showflat', plaza: 'lamp', field: 'pacer', interchange: 'train', residential: 'silhouette', corner: 'diner', fog: 'lampsOff' };
 const districtZones = new Map();          // "di,dj" → zone, so returning to a district shows the same thing
 const DS = 12;                            // blocks per side of a district: about 1.1 km, 30-50 s of driving per zone
 const districtOf = v => Math.floor(v / DS);
@@ -1773,6 +1773,15 @@ function genCell(i, j) {
       for (let u = W0 + 1.5; u < W1; u += 3) if (!inGate(u)) put('pole', u, 2, 0.08, 4, 0.16);
       for (const u of [W0 + 16, W0 + 30, W0 + 46]) if (!inGate(u)) put('pole', u, H / 2, 0.25, H, 0.25);
       for (let r = 1; r <= 3; r++) for (let u = W0 + 1; u < W1; u += 2) if (rnd() < 1 / 6 && !(inGate(u) && r < 3)) put('pole', u, 3.2 * r + 1.45, 1.6, 1.1, 0.6);
+    }
+    if (mom && mom.type === 'flicker') {
+      // moment: the same television in a hundred rooms. For six seconds every marked window on every facade in view
+      // flickers in perfect unison, then they all stop at once.
+      momentPos = new THREE.Vector3(i * C + (W0 + W1) / 2, 0, j * C + (W0 + W1) / 2); let begun = false, told = false;
+      ticks.push((dt, t) => {
+        if (!begun) { if (Math.hypot(car.pos.x - momentPos.x, car.pos.z - momentPos.z) < 150) { begun = true; tvFlicker.until = t + 6; tvFlicker.next = 0; } return; }
+        if (!told && t >= tvFlicker.until) { told = true; if (moments.active === mom) momentDone(true); }
+      });
     }
     lampOn = 0.7; sodium = true;
   } else if (zone === 'port') {
@@ -3584,6 +3593,8 @@ function frame() {
   if (started) { drive(dt); directorTick(dt); momentsTick(dt, elapsed); }
   NIGHT.value = dayMode ? 0 : director.litFraction;          // by day no window is lit
   NIGHT_DENSE.value = dayMode ? 0 : Math.max(0.55, director.litFraction);
+  if (elapsed >= tvFlicker.until) TV.value = 0;                 // it cuts out in one frame
+  else if (elapsed >= tvFlicker.next) { TV.value = dayMode ? 0 : 0.12 + Math.random() * 0.38; tvFlicker.next = elapsed + 0.08 + Math.random() * 0.27; }   // one shared signal, a new level every 0.08 to 0.35 s
   updateCells(); pumpCells(started ? 2 : 4);
 
   carMesh.position.copy(car.pos);
