@@ -1387,8 +1387,8 @@ function flush(bk, grp, geos) {
 
 /* ---------- director: decides what each new district becomes ---------- */
 // The city stays endless. Each 12×12-block district gets one zone the first time it comes into range,
-// following the drive's order (sameness → scale → exposure → people you can't reach → fading out).
-const ZONES = ['corridor', 'office', 'boulevard', 'newtown', 'plaza', 'field', 'interchange', 'residential', 'corner', 'fog'];
+// following the drive's order (sameness → scale → exposure → non-places → people you can't reach → fading out).
+const ZONES = ['corridor', 'office', 'boulevard', 'newtown', 'plaza', 'field', 'interchange', 'port', 'residential', 'density', 'corner', 'soon', 'fog'];
 const ZONE_NAMES = {
   corridor: ['The Long Repeat', 'Parallel Row', 'Corridor Nine', 'Same Street'],
   office: ['Business Park 3', 'Units 14–40', 'The Low Glass', 'Parkway South'],
