@@ -3843,6 +3843,7 @@ function frame() {
   if (started) radio.atmos(zoneMix.newtown, wallDepth, zoneMix);
   scene.fog.density = (radio.rainOn ? 0.0085 : 0.007) * LOOKC.fogD * (1 + 1.5 * fogMix);
   sky.material.uniforms.mid.value.lerp(FOG, fogMix * 0.75); sky.material.uniforms.hor.value.lerp(FOG, fogMix * 0.6);
+  sky.material.uniforms.hor.value.lerp(sky.material.uniforms.mid.value, 0.9 * zoneMix.density);   // Density Wall has no horizon: the glow at the end of the street goes; the stars and moon stay
   skyGroup.children[0].material.opacity = 0.35 * (1 - fogMix); skyGroup.children[1].material.opacity = 1 - 0.85 * fogMix;
   // wipers, while it rains and you're in the car
   if (started && vehicle === 'car' && radio.rainOn && elapsed > nextWipe) { nextWipe = elapsed + 1.9; radio.wiper(); }
