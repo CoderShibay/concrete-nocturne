@@ -1876,7 +1876,7 @@ function genCell(i, j) {
     // Most windows are lit: the one district that is full of people, none of them reachable.
     plinth(FLAT);
     const H = 190 + zr() * 50, W0 = LOT_A, W1 = LOT_B, c0 = W0 + 13, c1 = W1 - 13;   // four wings 13 m deep around a 36 m courtyard
-    const gated = (li + lj) % 2 === 0, g0 = 60.5, g1 = 69.5, GH = 7;             // on every other block a 9 × 7 m gate lets you drive into the courtyard
+    const gated = (li + lj) % 2 === 0, g0 = 48.5, g1 = 57.5, GH = 7;             // on every other block a 9 × 7 m gate lets you drive into the courtyard. It sits between the street lamps at 40 and 66 m
     const wing = (x0, x1, z0, z1, y0 = 0) => { addBox(bk, 'winDense', 'roof', x1 - x0, H - y0, z1 - z0, (x0 + x1) / 2, ph + y0 + (H - y0) / 2, (z0 + z1) / 2, same); solids.push({ x0, x1, z0, z1, y0, y1: ph + H }); };
     wing(W0, W1, c1, W1); wing(W0, c0, c0, c1); wing(c1, W1, c0, c1);
     if (!gated) wing(W0, W1, W0, c0);
@@ -1887,7 +1887,7 @@ function genCell(i, j) {
       for (const gx of [g0 + 0.03, g1 - 0.03]) addBox(bk, 'shutter', 'shutter', 0.06, GH, 13, gx, ph + GH / 2, (W0 + c0) / 2);   // the passage walls
     }
     // the courtyard: one working lamp, one dead one, four parked cars, a row of bins
-    for (const [lx, on] of [[78, true], [52, false]]) {
+    for (const [lx, on] of [[78, true], [66, false]]) {                         // the dead one stands clear of the gate's way in
       addBox(bk, 'pole', 'pole', 0.2, 6, 0.2, lx, ph + 3, 52); addBox(bk, on ? 'lamp' : 'pole', on ? 'lamp' : 'pole', 0.7, 0.22, 0.7, lx, ph + 6, 52);
       if (on) addFlat(bk, 'glow', lx, 52, 16, ph + 0.04);
       solids.push({ x0: lx - 0.3, x1: lx + 0.3, z0: 51.7, z1: 52.3, y0: 0, y1: 6 });
