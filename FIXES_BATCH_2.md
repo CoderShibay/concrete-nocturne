@@ -3,7 +3,7 @@
 Written by the design agent for the build session, against commit `419a2f5` (2026-10-12).
 Approved by Ali on 2026-10-12, including the bloom change.
 
-> **Status: DONE on 2026-10-12** (commits `c977f84` to the E1 commit, one per fix). Where the build differs from this list:
+> **Status: sections B to E DONE on 2026-10-12. Section A (sound) was applied, then pulled back the same day at Ali's request** (reverts `294bd60` to `5afb5cb`); the sound is as it was before this list. The A notes below record what was measured while it was in. Where the build differs from this list:
 > - **A2:** the tool's 3-second window falls in the trough of the wind's 11-second swell, so it prints about −40 dB; the top of the swell measures −33.5 dB.
 > - **A5:** Field of Blocks only dropped the music 5.3 dB, so the duck was deepened; it now drops 7.5 dB. Never Lived In was left alone: its level does not change, only 0.1% → 0.6% of its energy above 2.5 kHz.
 > - **B2:** lit rooms stop at 58%, not 65% (the sales pavilion went near-white at 65%). The other four reached their targets.
