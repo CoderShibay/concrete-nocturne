@@ -1354,7 +1354,7 @@ const director = { distanceDriven: 0, driveTime: 0, sinceLastMoment: 0, nextGap:
 // Moments: one small sign of other people at a time, 30–50 s apart (the rhythm). A moment is placed in the block
 // that is about to appear ahead of the car; it only counts once the car has actually passed it.
 const moments = { pending: false, active: null, cache: new Map(), lingering: [] };
-const MOMENT_FOR = { corridor: 'bridge', office: 'sensor', boulevard: 'window', newtown: 'showflat', plaza: 'lamp', field: 'pacer', interchange: 'train', residential: 'silhouette', corner: 'diner', fog: 'lampsOff' };
+const MOMENT_FOR = { port: 'lift', corridor: 'bridge', office: 'sensor', boulevard: 'window', newtown: 'showflat', plaza: 'lamp', field: 'pacer', interchange: 'train', residential: 'silhouette', corner: 'diner', fog: 'lampsOff' };
 const districtZones = new Map();          // "di,dj" → zone, so returning to a district shows the same thing
 const DS = 12;                            // blocks per side of a district: about 1.1 km, 30-50 s of driving per zone
 const districtOf = v => Math.floor(v / DS);
@@ -1442,9 +1442,11 @@ function pingPong(t, len, v, pause) {
 }
 // A gantry crane over the Port's stacks, on rails at z 44 and z 86. It is always working: the trolley runs along the
 // beam, the whole crane creeps along its rails, a spreader hangs under the trolley, and the cab is lit and empty.
-const GANTRY = { top: 24, hw: 5, z0: 43, z1: 87.6, hang: 16.8 };
-function buildGantry(c) {
-  const { grp, extras, solids, ticks, rnd } = c, { top, hw, z0, z1, hang } = GANTRY;
+const GANTRY = { top: 24, hw: 5, z0: 43, z1: 87.6, hang: 16.8, zOut: 15, carry: 16.9 };   // zOut: the middle of the x-road; carry: how high a lifted box travels, clear of the tallest stack
+// With `lift` it is the moment's crane instead: it stands still, its beam reaches out over the x-road, and when you
+// come near it carries one container out over your head, holds it there, and takes it back.
+function buildGantry(c, lift) {
+  const { grp, extras, solids, ticks, rnd } = c, { top, hw, z1, hang } = GANTRY, z0 = lift ? GANTRY.zOut - 3 : GANTRY.z0;
   const crane = new THREE.Group(), trolley = new THREE.Group(); crane.add(trolley); grp.add(crane);
   const mesh = (parent, bkt) => { const out = []; for (const k in bkt) { const g = geoOf(bkt[k]), m = new THREE.Mesh(g, mats[k]); parent.add(m); extras.push(g); out.push(m); } return out; };
   const sb = {}, legs = [];
@@ -1466,8 +1468,27 @@ function buildGantry(c) {
   const hangAt = y => { spreader.position.y = y; cables.scale.y = top - 1.2 - (y + 0.3); };
   const place = (x, z) => { crane.position.x = x; trolley.position.z = z; for (const so of legs) { so.x0 = x + so.lx - 0.45; so.x1 = x + so.lx + 0.45; } beam.x0 = x - 1; beam.x1 = x + 1; };
   const p1 = rnd() * 400, p2 = rnd() * 200;
-  hangAt(hang); place(65, 65);
-  ticks.push((dt, t) => place(45 + pingPong(t + p1, 40, 0.4, 3), 47 + pingPong(t + p2, 36, 1.2, 4)));
+  if (!lift) {
+    hangAt(hang); place(65, 65);
+    ticks.push((dt, t) => place(45 + pingPong(t + p1, 40, 0.4, 3), 47 + pingPong(t + p2, 36, 1.2, 4)));
+    return;
+  }
+  const CH = CONTAINER.h, mix = (a, b, k) => a + (b - a) * smooth(k), { zOut, carry } = GANTRY;
+  const pose = T => {                                                          // 4 s up, 5 s out, 2 s held over the road, 5 s back, 4 s down
+    const y = T < 4 ? mix(lift.rest, carry, T / 4) : T < 16 ? carry : mix(carry, lift.rest, (T - 16) / 4);
+    const z = T < 4 ? lift.z : T < 9 ? mix(lift.z, zOut, (T - 4) / 5) : T < 11 ? zOut : T < 16 ? mix(zOut, lift.z, (T - 11) / 5) : lift.z;
+    lift.box.position.set(lift.x, y, z); place(lift.x, z); hangAt(y + CH);
+  };
+  let T = -1, told = false; pose(0);
+  ticks.push(dt => {
+    const d = Math.hypot(car.pos.x - lift.wx, car.pos.z - lift.wz);
+    if (T < 0) { if (d < 120) T = 0; return; }
+    if (T < 20) {
+      T = Math.min(20, T + dt); pose(T);
+      if (T === 20) { radio.clank(panFor(lift.wx, lift.wz), 1.5); radio.trainHorn(0.5, 0.5); }   // it sets down; a ship's horn, far off
+    }
+    if (!told && (T === 20 || d > 200)) { told = true; if (moments.active === lift.mom) momentDone(true); }
+  });
   return { crane, trolley, hangAt, place };
 }
 
@@ -1700,6 +1721,8 @@ function genCell(i, j) {
       const n = 2 + Math.floor(rnd() * 5), key = 'box' + Math.floor(rnd() * 5), x = bays[b] + CL / 2, z = groups[g] + (c + 0.5) * CW;
       cols.push({ g, c, b, n, key, x, z });
     }
+    const liftMom = mom && mom.type === 'lift' ? mom : null, lc = liftMom ? cols.find(q => q.g === 0 && q.c === 0 && q.b === 1) : null;
+    if (lc) lc.n = Math.max(lc.n, 3) - 1;                                      // its top box is the one the crane will carry
     for (const q of cols) {
       addBox(bk, q.key, q.key, CL, q.n * CH, CW, q.x, ph + q.n * CH / 2, q.z);
       solids.push({ x0: q.x - CL / 2, x1: q.x + CL / 2, z0: q.z - CW / 2, z1: q.z + CW / 2, y0: 0, y1: ph + q.n * CH });
@@ -1715,7 +1738,12 @@ function genCell(i, j) {
       solids.push({ x0: mx - 0.4, x1: mx + 0.4, z0: mz - 0.4, z1: mz + 0.4, y0: 0, y1: ph + 30 });
     }
     for (const rz of [44, 86]) addBox(bk, 'pole', 'pole', 50, 0.05, 0.3, 65, ph + 0.03, rz);     // crane rails
-    if ((li + 2 * lj) % 3 === 0) buildGantry({ grp, extras, solids, ticks, rnd });
+    if (lc) {
+      const b2 = {}; addBox(b2, lc.key, lc.key, CL, CH, CW, 0, CH / 2, 0);
+      const g = geoOf(b2[lc.key]), box = new THREE.Mesh(g, mats[lc.key]); grp.add(box); extras.push(g);
+      buildGantry({ grp, extras, solids, ticks, rnd }, { mom: liftMom, box, x: lc.x, z: lc.z, rest: ph + lc.n * CH, wx: i * C + lc.x, wz: j * C + R });
+      momentPos = new THREE.Vector3(i * C + lc.x, 0, j * C + R);
+    } else if ((li + 2 * lj) % 3 === 0) buildGantry({ grp, extras, solids, ticks, rnd });
     lampOn = 0.8; sodium = true;
   } else if (zone === 'interchange') {
     // P9: elevated roads cross overhead on columns that stand only on the lots. They come out of one concrete
@@ -2190,6 +2218,7 @@ function placeMoment(ci, cj) {
   let type = MOMENT_FOR[zone];
   if (type === 'window' && (li + lj) % 2) type = 'taillights';            // no tower on this block of the boulevard
   if (type === 'bridge' && Math.random() < 0.35) type = 'taillights';
+  if (type === 'lift' && li === DS >> 1 && lj === DS >> 1) type = 'taillights';   // the dock basin has no crane
   if (type === 'showflat') {
     if ((alongZ ? li : lj) % 3 === 2) type = 'taillights';                // this road only passes lots nobody has built on
     else if (newtownLot(li, lj) !== 'towers') return;                     // wait for the next tower block
@@ -3008,11 +3037,11 @@ const radio = {
     s2.connect(f); f.connect(g); if (p) { p.pan.value = pan; g.connect(p); p.connect(this.comp); p.connect(this.rev); } else g.connect(this.comp);
     s2.start(t, Math.random()); s2.stop(t + 0.06);
   },
-  trainHorn() { // closer than the distant one: the lit train crossing ahead
+  trainHorn(pitch = 1, vol = 1) { // closer than the distant one: the lit train crossing ahead. Pitched down, it is a ship
     if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, out = ctx.createGain(), lp = ctx.createBiquadFilter(), dur = 3.6;
     lp.type = 'lowpass'; lp.frequency.value = 1300; out.connect(lp); lp.connect(this.comp); lp.connect(this.rev);
-    for (const f of [277, 330, 415]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = Math.random() * 10 - 5; o.connect(out); o.start(t); o.stop(t + dur); }
-    out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(0.014, t + 0.4); out.gain.setValueAtTime(0.014, t + 2.4); out.gain.linearRampToValueAtTime(0, t + dur);
+    for (const f of [277, 330, 415]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f * pitch; o.detune.value = Math.random() * 10 - 5; o.connect(out); o.start(t); o.stop(t + dur); }
+    out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(0.014 * vol, t + 0.4); out.gain.setValueAtTime(0.014 * vol, t + 2.4); out.gain.linearRampToValueAtTime(0, t + dur);
   },
   thump(v) {
     if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
