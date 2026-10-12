@@ -1440,7 +1440,7 @@ function genCell(i, j) {
     facades.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, y0: base, y1: base + h });
     roofs.push({ x, z, w, d, y: base + h });
   };
-  let ph = 1, signChance = 0, lampOn = 0.7, sodium = false, hum = null;
+  let ph = 1, signChance = 0, lampOn = 0.7, sodium = false, hum = null, hole = false;   // hole: this lot sinks below the road, so the flat ground is cut away under it
   const FLAT = 0.06;                                                           // a flush plinth: just paving, you can drive across it
   const plinth = h => { ph = h; addBox(bk, 'concrete', 'roof', L, ph, L, mid, ph / 2, mid, rnd); solids.push({ x0: A, x1: B, z0: A, z1: B, y0: 0, y1: ph }); };
 
@@ -1618,7 +1618,7 @@ function genCell(i, j) {
     lampOn = 0.15;
   } else if (zone === 'field') {
     // Field of Blocks: no tower, no sign, no lamp inside the lot. The skyline is whatever the neighbours show.
-    ph = FLAT;
+    ph = FLAT; hole = true;
     const f = fieldOf(di, dj), w = fieldSwell(f, li, lj), gnd = (x, z) => -FIELD.dip * fieldIn(x, z) * w;
     { // the lot's paving, sunk into a bowl; the flat ground plane is cut away under it (see HOLES)
       const pg = new THREE.PlaneGeometry(LOT_B - LOT_A, LOT_B - LOT_A, 16, 16); pg.rotateX(-Math.PI / 2); pg.translate((LOT_A + LOT_B) / 2, 0, (LOT_A + LOT_B) / 2);
@@ -1827,7 +1827,7 @@ function genCell(i, j) {
 
   flush(bk, grp, geos);
   scene.add(grp);
-  return { grp, geos, signMats, flick, zone, extras, momentPos, solids, hum, tick: ticks.length ? (dt, t) => ticks.forEach(f => f(dt, t)) : null };
+  return { grp, geos, signMats, flick, zone, extras, momentPos, solids, hum, hole, tick: ticks.length ? (dt, t) => ticks.forEach(f => f(dt, t)) : null };
 }
 function disposeCell(c) {
   scene.remove(c.grp); c.geos.forEach(g => g.dispose()); c.signMats.forEach(m => m.dispose()); c.extras.forEach(x => x.dispose());
@@ -2152,14 +2152,14 @@ function momentsTick(dt, t) {
 
 /* ---------- ground ---------- */
 // The world ground is one flat plane that follows the car. Where a Field of Blocks lot sinks below it, the plane is
-// cut away: one texel per block around the car says "this lot is a bowl", and the lot's own paving is drawn instead.
+// cut away: one texel per block around the car says "this lot sinks" (a cell's hole flag), and the lot's own surface is drawn instead.
 const HOLES = { n: 32, data: new Uint8Array(32 * 32), tex: { value: null }, origin: { value: new THREE.Vector2() }, dirty: true };
 HOLES.tex.value = new THREE.DataTexture(HOLES.data, HOLES.n, HOLES.n, THREE.LuminanceFormat);
 function updateHoles() {
   HOLES.dirty = false; HOLES.data.fill(0);
   const oi = (lastCi || 0) - HOLES.n / 2, oj = (lastCj || 0) - HOLES.n / 2; HOLES.origin.value.set(oi, oj);
   for (const [k, c] of cells) {
-    if (c.zone !== 'field') continue;
+    if (!c.hole) continue;
     const [i, j] = k.split(',').map(Number), ti = i - oi, tj = j - oj;
     if (ti >= 0 && tj >= 0 && ti < HOLES.n && tj < HOLES.n) HOLES.data[tj * HOLES.n + ti] = 255;
   }
