@@ -2841,7 +2841,7 @@ let composer = null, bloom = null, lofiPass = null;
 try {
   composer = new THREE.EffectComposer(renderer);
   composer.addPass(new THREE.RenderPass(scene, camera));
-  bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.95, 0.55, 0.3);
+  bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.9, 0.55, 0.45);   // strength, radius, threshold: the night values in LOOKS
   composer.addPass(bloom);
   lofiPass = new THREE.ShaderPass({
     uniforms: { tDiffuse: { value: null }, time: { value: 0 } },
@@ -3339,7 +3339,7 @@ function toggleMusic() {
   radio.setMusic(!radio.musicOn); $('bMusic').classList.toggle('on', radio.musicOn); document.body.classList.toggle('music-on', radio.musicOn && started); }
 // Day: the same city under a pale, hazy sky. Street lamps and windows are off, the sun is out, the haze is light.
 const LOOKS = {
-  night: { fog: 0x0f141c, fogD: 1, top: 0x010207, mid: 0x0a1426, hor: 0x2a1d14, hemiSky: 0x4d5c78, hemiGnd: 0x0d0b09, hemi: 0.7, sun: 0x9aa8ff, sunI: 0.35, sunPos: [-0.4, 1, -0.6], bloomT: 0.3, bloomS: 0.95, lamp: 0xffa24a, lampv: 0xcdeed4 },
+  night: { fog: 0x0f141c, fogD: 1, top: 0x010207, mid: 0x0a1426, hor: 0x2a1d14, hemiSky: 0x4d5c78, hemiGnd: 0x0d0b09, hemi: 0.7, sun: 0x9aa8ff, sunI: 0.35, sunPos: [-0.4, 1, -0.6], bloomT: 0.45, bloomS: 0.9, lamp: 0xffa24a, lampv: 0xcdeed4 },
   day: { fog: 0xa9b3bb, fogD: 0.55, top: 0x5b84b3, mid: 0x9bb3cb, hor: 0xc8cdd0, hemiSky: 0xdfe6ef, hemiGnd: 0x4c4843, hemi: 1.05, sun: 0xfff0da, sunI: 1.5, sunPos: [0.5, 1, 0.35], bloomT: 0.92, bloomS: 0.3, lamp: 0x8c8a84, lampv: 0x8c8a84 },
 };
 const LOOKC = { hor: new THREE.Color(), mid: new THREE.Color() }, _fc = new THREE.Color();
@@ -3404,7 +3404,7 @@ function setPaused(p) {
 $('bPause').onclick = () => setPaused(true);
 applyShip(0);
 $('bTime').onclick = () => setDay(!dayMode);
-LOOKC.hor.setHex(LOOKS.night.hor); LOOKC.mid.setHex(LOOKS.night.mid); Object.assign(LOOKC, { fogD: 1, hemi: 0.7, sunI: 0.35, bloomS: 0.95 });
+LOOKC.hor.setHex(LOOKS.night.hor); LOOKC.mid.setHex(LOOKS.night.mid); Object.assign(LOOKC, { fogD: 1, hemi: 0.7, sunI: 0.35, bloomS: 0.9 });
 $('resume').onclick = () => setPaused(false);
 document.addEventListener('visibilitychange', () => { if (document.hidden && started && !paused) setPaused(true); }); // leaving the tab pauses the drive
 for (const ev of ['pointerdown', 'keydown', 'touchend']) addEventListener(ev, () => { if (started) wakeAudio(); }, true);
