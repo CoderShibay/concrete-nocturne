@@ -1014,7 +1014,7 @@ const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.4, 18
 
 const hemi = new THREE.HemisphereLight(0x4d5c78, 0x0d0b09, 0.7); scene.add(hemi);
 let flash = 0, flashQueue = [], nextThunder = 18, nextDistant = 35, fogMix = 0, nextWipe = 0, wallDepth = 0, nextClank = 0;
-const zoneMix = { newtown: 0, port: 0 };   // how far into each of these districts' own sound you are, 0 to 1
+const zoneMix = { newtown: 0, port: 0, density: 0 };   // how far into each of these districts' own sound you are, 0 to 1
 const moonLight = new THREE.DirectionalLight(0x9aa8ff, 0.35);
 moonLight.position.set(-0.4, 1, -0.6); scene.add(moonLight);
 
@@ -1060,30 +1060,39 @@ function radialTex(inner, outer, size = 128) {
 // The night runs down: each lit window gets a random switch-off point (stored in a small grey texture),
 // and a shader turns it off once the director's litFraction drops below it. Lower floors go dark first.
 const NIGHT = { value: 1 };
-function nightWindows(mat, offTex) {
+// Density Wall keeps its own count: its windows stay mostly lit all night (NIGHT_DENSE never falls below 0.55).
+// TV is one shared level for the televisions in its windows, so every facade in view flickers in unison.
+const NIGHT_DENSE = { value: 1 }, TV = { value: 0 };
+function nightWindows(mat, offTex, lit = NIGHT, tvTex = null) {
   mat.onBeforeCompile = sh => {
-    sh.uniforms.uLit = NIGHT; sh.uniforms.tOff = { value: offTex };
+    sh.uniforms.uLit = lit; sh.uniforms.tOff = { value: offTex };
+    if (tvTex) { sh.uniforms.uTV = TV; sh.uniforms.tTV = { value: tvTex }; }
     sh.vertexShader = 'varying float vWY;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWY = (modelMatrix * vec4(transformed, 1.0)).y;');
-    sh.fragmentShader = 'uniform float uLit;\nuniform sampler2D tOff;\nvarying float vWY;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `
+    sh.fragmentShader = 'uniform float uLit;\nuniform sampler2D tOff;\nuniform float uTV;\nuniform sampler2D tTV;\nvarying float vWY;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `
       vec4 emissiveColor = texture2D( emissiveMap, vUv );
       emissiveColor.rgb = emissiveMapTexelToLinear( emissiveColor ).rgb;
       float offAt = texture2D( tOff, vUv ).r + ( 1.0 - smoothstep( 12.0, 150.0, vWY ) ) * 0.35;
-      totalEmissiveRadiance *= emissiveColor.rgb * step( offAt, uLit );`);
+      totalEmissiveRadiance *= emissiveColor.rgb * step( offAt, uLit );` + (tvTex ? `
+      totalEmissiveRadiance += vec3( 0.45, 0.6, 1.0 ) * texture2D( tTV, vUv ).r * uTV;` : ''));
   };
 }
-function windowMaterial(variant, seed, litAmt = 0.4, base = null) {   // base: a paler, cleaner concrete (new, never lived in)
-  const W = 256, H = 512, cols = 8, rows = 16, cw = W / cols, ch = H / rows;
+// base: another concrete colour. clean: new and never lived in (no grime). Variant 4 is Density Wall: windows 2 m
+// apart, most of them lit, with air-conditioner boxes, laundry and plants painted under them, and a television mask.
+function windowMaterial(variant, seed, litAmt = 0.4, base = null, clean = !!base) {
+  const dense = variant === 4;
+  const W = dense ? 384 : 256, H = 512, cols = dense ? 12 : 8, rows = 16, cw = W / cols, ch = H / rows;
   const m = mkCanvas(W, H), e = mkCanvas(W, H), o = mkCanvas(W, H), a = m.getContext('2d'), b = e.getContext('2d'), c = o.getContext('2d');
+  const tv = dense ? mkCanvas(W, H) : null, d = tv && tv.getContext('2d'); if (d) { d.fillStyle = '#000'; d.fillRect(0, 0, W, H); }
   c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
-  a.fillStyle = base || '#2a2a2d'; a.fillRect(0, 0, W, H); speckle(a, W, H, base ? 900 : 3500, base ? 0.12 : 0.28, false); speckle(a, W, H, 1500, 0.06, true);
+  a.fillStyle = base || '#2a2a2d'; a.fillRect(0, 0, W, H); speckle(a, W, H, clean ? 900 : 3500, clean ? 0.12 : 0.28, false); speckle(a, W, H, 1500, 0.06, true);
   a.fillStyle = 'rgba(0,0,0,.3)'; for (let y = 0; y < H; y += ch) a.fillRect(0, y, W, 2);
-  if (!base) { a.fillStyle = 'rgba(0,0,0,.12)'; for (let y = 0; y < H; y += ch) a.fillRect(0, y + ch - 5, W, 5); } // stain streaks
+  if (!clean) { a.fillStyle = 'rgba(0,0,0,.12)'; for (let y = 0; y < H; y += ch) a.fillRect(0, y + ch - 5, W, 5); } // stain streaks
   b.fillStyle = '#000'; b.fillRect(0, 0, W, H);
   const rnd = mulberry(seed);
   const lit = ['#ffcf8a', '#ffbd70', '#ffe2b4', '#a9c8ec', '#c9f0c0'];
   const pick = () => { const r = rnd(); return r < 0.8 ? lit[Math.floor(rnd() * 3)] : r < 0.93 ? lit[3] : lit[4]; };
   const light = (x, y, w, h) => {
-    const col = pick(), v = Math.floor((0.03 + rnd() * 0.97) * 255);
+    const col = pick(), v = Math.floor((0.03 + rnd() * (dense ? 0.72 : 0.97)) * 255);   // when this window goes out; the dense ones hold on longer
     b.globalAlpha = 0.45 + rnd() * 0.55; b.fillStyle = col; b.fillRect(x, y, w, h); b.globalAlpha = 1;
     c.fillStyle = `rgb(${v},${v},${v})`; c.fillRect(x, y, w, h);
   };
@@ -1093,7 +1102,17 @@ function windowMaterial(variant, seed, litAmt = 0.4, base = null) {   // base: a
       for (let c = 0; c < cols; c++) if (rnd() < 0.3 * litAmt) light(c * cw + 1, y + 1, cw - 2, hh - 2);
       continue;
     }
-    for (let c = 0; c < cols; c++) {
+    for (let c = 0; dense && c < cols; c++) {
+      const x = c * cw + 7, y = r * ch + 5, w = cw - 14, h = ch - 15;
+      a.fillStyle = '#0b0c0f'; a.fillRect(x, y, w, h);
+      if (rnd() < litAmt) light(x + 1, y + 1, w - 2, h - 2);
+      if (rnd() < 0.12) { d.fillStyle = '#fff'; d.fillRect(x + 2, y + 2, w - 4, h - 4); }         // a television in this room
+      const q = rnd();                                                                              // the only irregularities
+      if (q < 0.4) { a.fillStyle = '#505256'; a.fillRect(x + 3, y + h + 2, 12, 6); a.fillStyle = '#2c2d30'; a.fillRect(x + 5, y + h + 4, 8, 2); }
+      else if (q < 0.55) { const n = 3 + Math.floor(rnd() * 2); for (let k = 0; k < n; k++) { a.fillStyle = ['#7a3b3b', '#3b5a7a', '#8a8468', '#59705c', '#b0aca0'][Math.floor(rnd() * 5)]; a.fillRect(x + k * 5, y + h + 2, 4, 5 + Math.floor(rnd() * 4)); } }
+      else if (q < 0.65) { a.fillStyle = '#2f4a35'; a.fillRect(x + 2, y + h - 4, 7, 5); a.fillStyle = '#4a3a2c'; a.fillRect(x + 3, y + h + 1, 5, 3); }
+    }
+    for (let c = 0; !dense && c < cols; c++) {
       let x, y, w, h;
       if (variant === 0) { x = c * cw + 6; y = r * ch + 8; w = cw - 12; h = ch - 14; }
       else if (variant === 1) { x = c * cw + 12; y = r * ch + 4; w = 8; h = ch - 8; }
@@ -1105,7 +1124,9 @@ function windowMaterial(variant, seed, litAmt = 0.4, base = null) {   // base: a
   const tm = new THREE.CanvasTexture(m), te = new THREE.CanvasTexture(e), to = new THREE.CanvasTexture(o);
   for (const t of [tm, te, to]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso; }
   const mat = new THREE.MeshStandardMaterial({ map: tm, emissiveMap: te, emissive: 0xffffff, emissiveIntensity: 1.0, roughness: 0.92, metalness: 0 });
-  nightWindows(mat, to);
+  let ttv = null; if (tv) { ttv = new THREE.CanvasTexture(tv); ttv.wrapS = ttv.wrapT = THREE.RepeatWrapping; }
+  if (dense) mat.emissiveIntensity = 0.7;                       // so many lit windows together: dimmed so they keep their colour under bloom
+  nightWindows(mat, to, dense ? NIGHT_DENSE : NIGHT, ttv);
   return mat;
 }
 function concreteMaterial() {
@@ -1190,6 +1211,8 @@ const mats = {
   officeLit: officeLitMaterial(),
   paint: new THREE.MeshStandardMaterial({ color: 0x8a8b8f, roughness: 0.8 }),                        // car-park lines, not lit
   glowf: glowMat(0xd6ecd0, 0.3),
+  winDense: windowMaterial(4, 97, 0.75),                                                             // Density Wall: most windows lit
+  shutter: new THREE.MeshStandardMaterial({ color: 0x16171a, roughness: 0.7 }),                       // its ground floor: rolled-down shutters
   winDead: windowMaterial(0, 83, 0, '#4b4a45'),                                                       // no window ever lit
   flood: new THREE.MeshBasicMaterial({ color: FLOOD, fog: false }),                                   // stadium floodlights carry through the haze
   glowp: pitchMaterial(),
@@ -1349,6 +1372,7 @@ const ZONE_NAMES = {
   residential: ['Hundred Windows', 'The Tower Estate', 'Balcony Wall', 'Block of Strangers'],
   corner: ['The All-Night Corner', 'Where the Diner Was', 'Last Counter', 'Payphone Street'],
   fog: ['Where It Thins Out', 'The Last Lamps', 'Low Tide', 'Edge of the Grid'],
+  density: ['No Horizon', 'Ten Thousand Windows', 'Monster Block', 'The Inner Courtyard'],
   port: ['Terminal Four', 'Stack Yard', 'The Gantries', 'Berth 9'],
 };
 const director = { distanceDriven: 0, driveTime: 0, sinceLastMoment: 0, nextGap: 25, litFraction: 1, musicDensity: 1 };
@@ -1713,6 +1737,24 @@ function genCell(i, j) {
       solids.push({ x0, x1, z0, z1, y0: base, y1: top });
     }
     lampOn = 0.5; sodium = true;
+  } else if (zone === 'density') {
+    // Density Wall: a hollow block that fills the whole lot, so tall and so tightly packed that the sky is a strip.
+    // Most windows are lit: the one district that is full of people, none of them reachable.
+    plinth(FLAT);
+    const H = 190 + zr() * 50, W0 = LOT_A, W1 = LOT_B, c0 = W0 + 13, c1 = W1 - 13;   // four wings 13 m deep around a 36 m courtyard
+    const gated = false, g0 = 60.5, g1 = 69.5, GH = 7;
+    const wing = (x0, x1, z0, z1, y0 = 0) => { addBox(bk, 'winDense', 'roof', x1 - x0, H - y0, z1 - z0, (x0 + x1) / 2, ph + y0 + (H - y0) / 2, (z0 + z1) / 2, same); solids.push({ x0, x1, z0, z1, y0, y1: ph + H }); };
+    wing(W0, W1, c1, W1); wing(W0, c0, c0, c1); wing(c1, W1, c0, c1); wing(W0, W1, W0, c0);
+    // street level on all four outer faces: a 4 m band of shutters, no signs; above it balcony cages and pipes
+    const face = (alongX, at, n) => (key, u, y, len, hh, thick) => { const o = at + n * thick / 2; if (alongX) addBox(bk, key, key, len, hh, thick, u, ph + y, o); else addBox(bk, key, key, thick, hh, len, o, ph + y, u); };
+    for (const [alongX, at, n] of [[true, W0, -1], [true, W1, 1], [false, W0, -1], [false, W1, 1]]) {
+      const put = face(alongX, at, n), front = alongX && n < 0 && gated, inGate = u => front && u > g0 - 0.5 && u < g1 + 0.5;
+      if (front) { put('shutter', (W0 + g0) / 2, 2, g0 - W0, 4, 0.1); put('shutter', (g1 + W1) / 2, 2, W1 - g1, 4, 0.1); } else put('shutter', (W0 + W1) / 2, 2, W1 - W0, 4, 0.1);
+      for (let u = W0 + 1.5; u < W1; u += 3) if (!inGate(u)) put('pole', u, 2, 0.08, 4, 0.16);
+      for (const u of [W0 + 16, W0 + 30, W0 + 46]) if (!inGate(u)) put('pole', u, H / 2, 0.25, H, 0.25);
+      for (let r = 1; r <= 3; r++) for (let u = W0 + 1; u < W1; u += 2) if (rnd() < 1 / 6 && !(inGate(u) && r < 3)) put('pole', u, 3.2 * r + 1.45, 1.6, 1.1, 0.6);
+    }
+    lampOn = 0.7; sodium = true;
   } else if (zone === 'port') {
     // The Port: a container terminal that runs all night with nobody visible. Stacks like canyon walls, the only
     // colour in the city, and cranes that move on their own.
@@ -2777,6 +2819,17 @@ const radio = {
       o.frequency.value = 750; g.gain.value = 0.3; sweep.frequency.value = 1 / 8; sg.gain.value = 150;
       sweep.connect(sg); sg.connect(o.frequency); o.connect(g); g.connect(this.portG); o.start(); sweep.start(); }
 
+    // Density Wall: a murmur of televisions (two bands of noise, each rising and falling at the rate of speech) and
+    // an air-conditioner hum. The loudest district, with nobody to talk to.
+    this.densG = ctx.createGain(); this.densG.gain.value = 0; this.densG.connect(comp);
+    for (const [f, rate, rate2] of [[700, 3.4, 0.31], [1400, 4.7, 0.23]]) {
+      const src = ctx.createBufferSource(), bq = ctx.createBiquadFilter(), am = ctx.createGain(); src.buffer = nb; src.loop = true; bq.type = 'bandpass'; bq.frequency.value = f; bq.Q.value = 4; am.gain.value = 0.5;
+      for (const [r, depth] of [[rate, 0.35], [rate2, 0.15]]) { const l = ctx.createOscillator(), lg = ctx.createGain(); l.frequency.value = r; lg.gain.value = depth; l.connect(lg); lg.connect(am.gain); l.start(); }
+      src.connect(bq); bq.connect(am); am.connect(this.densG); src.start(0, Math.random());
+    }
+    this.acG = ctx.createGain(); this.acG.gain.value = 0; this.acG.connect(comp);
+    { const o = ctx.createOscillator(); o.frequency.value = 120; o.connect(this.acG); o.start(); }
+
     this.full = true;   // rain, engine, hover hum and the rest are all in place
   },
   mtof: n => 440 * Math.pow(2, (n - 69) / 12),
@@ -3049,6 +3102,7 @@ const radio = {
     if (!this.full) return;
     this.rainDuck.gain.setTargetAtTime(1 - 0.6 * depth, t, 0.15);
     this.portG.gain.setTargetAtTime(0.02 * zm.port, t, 0.15);
+    this.densG.gain.setTargetAtTime(0.02 * zm.density, t, 0.15); this.acG.gain.setTargetAtTime(0.01 * zm.density, t, 0.15);
   },
   hum(level, pan) {
     if (!this.full) return; const t = this.ctx.currentTime;
@@ -3438,7 +3492,7 @@ function updateHud(elapsed) {
 
 /* ---------- map ---------- */
 // Blocks tinted by zone, your route as a faint sodium line. Moments are never shown: they stay surprises.
-const ZONE_TINT = { port: '#33393f', corridor: '#33363d', office: '#2f3338', boulevard: '#3c3933', newtown: '#2e3336', plaza: '#24272b', field: '#26282b', interchange: '#383742', residential: '#3a3632', corner: '#4b3d2b', fog: '#20242b' };
+const ZONE_TINT = { port: '#33393f', density: '#3d3a36', corridor: '#33363d', office: '#2f3338', boulevard: '#3c3933', newtown: '#2e3336', plaza: '#24272b', field: '#26282b', interchange: '#383742', residential: '#3a3632', corner: '#4b3d2b', fog: '#20242b' };
 const route = [], visitedDistricts = new Map();
 function mapRecord() {
   const last = route[route.length - 1];
@@ -3508,6 +3562,7 @@ function frame() {
   const dt = dt0; elapsed += dt;
   if (started) { drive(dt); directorTick(dt); momentsTick(dt, elapsed); }
   NIGHT.value = dayMode ? 0 : director.litFraction;          // by day no window is lit
+  NIGHT_DENSE.value = dayMode ? 0 : Math.max(0.55, director.litFraction);
   updateCells(); pumpCells(started ? 2 : 4);
 
   carMesh.position.copy(car.pos);
