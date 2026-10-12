@@ -1014,7 +1014,7 @@ const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.4, 18
 
 const hemi = new THREE.HemisphereLight(0x4d5c78, 0x0d0b09, 0.7); scene.add(hemi);
 let flash = 0, flashQueue = [], nextThunder = 18, nextDistant = 35, fogMix = 0, nextWipe = 0, wallDepth = 0, nextClank = 0;
-const zoneMix = { newtown: 0, port: 0, density: 0 };   // how far into each of these districts' own sound you are, 0 to 1
+const zoneMix = { newtown: 0, port: 0, density: 0, court: 0 };   // court: inside one of Density Wall's courtyards   // how far into each of these districts' own sound you are, 0 to 1
 const moonLight = new THREE.DirectionalLight(0x9aa8ff, 0.35);
 moonLight.position.set(-0.4, 1, -0.6); scene.add(moonLight);
 
@@ -1742,9 +1742,28 @@ function genCell(i, j) {
     // Most windows are lit: the one district that is full of people, none of them reachable.
     plinth(FLAT);
     const H = 190 + zr() * 50, W0 = LOT_A, W1 = LOT_B, c0 = W0 + 13, c1 = W1 - 13;   // four wings 13 m deep around a 36 m courtyard
-    const gated = false, g0 = 60.5, g1 = 69.5, GH = 7;
+    const gated = (li + lj) % 2 === 0, g0 = 60.5, g1 = 69.5, GH = 7;             // on every other block a 9 × 7 m gate lets you drive into the courtyard
     const wing = (x0, x1, z0, z1, y0 = 0) => { addBox(bk, 'winDense', 'roof', x1 - x0, H - y0, z1 - z0, (x0 + x1) / 2, ph + y0 + (H - y0) / 2, (z0 + z1) / 2, same); solids.push({ x0, x1, z0, z1, y0, y1: ph + H }); };
-    wing(W0, W1, c1, W1); wing(W0, c0, c0, c1); wing(c1, W1, c0, c1); wing(W0, W1, W0, c0);
+    wing(W0, W1, c1, W1); wing(W0, c0, c0, c1); wing(c1, W1, c0, c1);
+    if (!gated) wing(W0, W1, W0, c0);
+    else {                                                                      // the wing on the x-road, in two parts, with a lintel over the gate
+      wing(W0, g0, W0, c0); wing(g1, W1, W0, c0); wing(g0, g1, W0, c0, 9.6);     // the lintel's windows start three floors up, in line with the rest
+      addBox(bk, 'concrete', 'concrete', g1 - g0, 9.6 - GH, 13, (g0 + g1) / 2, ph + (GH + 9.6) / 2, (W0 + c0) / 2);   // a plain beam over the opening
+      solids.push({ x0: g0, x1: g1, z0: W0, z1: c0, y0: GH, y1: 9.6 });
+      for (const gx of [g0 + 0.03, g1 - 0.03]) addBox(bk, 'shutter', 'shutter', 0.06, GH, 13, gx, ph + GH / 2, (W0 + c0) / 2);   // the passage walls
+    }
+    // the courtyard: one working lamp, one dead one, four parked cars, a row of bins
+    for (const [lx, on] of [[78, true], [52, false]]) {
+      addBox(bk, 'pole', 'pole', 0.2, 6, 0.2, lx, ph + 3, 52); addBox(bk, on ? 'lamp' : 'pole', on ? 'lamp' : 'pole', 0.7, 0.22, 0.7, lx, ph + 6, 52);
+      if (on) addFlat(bk, 'glow', lx, 52, 16, ph + 0.04);
+      solids.push({ x0: lx - 0.3, x1: lx + 0.3, z0: 51.7, z1: 52.3, y0: 0, y1: 6 });
+    }
+    for (const cx of [52.95, 56.45, 59.95, 63.45]) {
+      addBox(bk, 'roof', 'roof', 1.9, 0.75, 4.4, cx, ph + 0.55, 78.2); addBox(bk, 'dark', 'dark', 1.6, 0.5, 2.2, cx, ph + 1.15, 78.5);
+      solids.push({ x0: cx - 0.95, x1: cx + 0.95, z0: 76, z1: 80.4, y0: 0, y1: 1.4 });
+    }
+    for (let k = 0; k < 5; k++) addBox(bk, 'roof', 'roof', 0.8, 0.8, 0.8, 70 + k * 1.1, ph + 0.4, 81.6);
+    solids.push({ x0: 69.6, x1: 74.8, z0: 81.2, z1: 82, y0: 0, y1: 0.8 });
     // street level on all four outer faces: a 4 m band of shutters, no signs; above it balcony cages and pipes
     const face = (alongX, at, n) => (key, u, y, len, hh, thick) => { const o = at + n * thick / 2; if (alongX) addBox(bk, key, key, len, hh, thick, u, ph + y, o); else addBox(bk, key, key, thick, hh, len, o, ph + y, u); };
     for (const [alongX, at, n] of [[true, W0, -1], [true, W1, 1], [false, W0, -1], [false, W1, 1]]) {
@@ -3102,7 +3121,8 @@ const radio = {
     if (!this.full) return;
     this.rainDuck.gain.setTargetAtTime(1 - 0.6 * depth, t, 0.15);
     this.portG.gain.setTargetAtTime(0.02 * zm.port, t, 0.15);
-    this.densG.gain.setTargetAtTime(0.02 * zm.density, t, 0.15); this.acG.gain.setTargetAtTime(0.01 * zm.density, t, 0.15);
+    this.densG.gain.setTargetAtTime((0.02 + 0.015 * zm.court) * zm.density, t, 0.15); this.rainDuck.gain.setTargetAtTime((1 - 0.6 * depth) * (1 - 0.3 * zm.court), t, 0.15);   // in a courtyard the murmur closes in and the rain backs off
+    this.acG.gain.setTargetAtTime(0.01 * zm.density, t, 0.15);
   },
   hum(level, pan) {
     if (!this.full) return; const t = this.ctx.currentTime;
@@ -3651,7 +3671,8 @@ function frame() {
   // P7: in a fog-edge district the fog thickens around you and the sky goes with it; it lifts as you leave
   const hereZone = districtZones.get(districtOf(Math.floor(car.pos.x / C)) + ',' + districtOf(Math.floor(car.pos.z / C)));
   fogMix += ((hereZone === 'fog' ? 1 : 0) - fogMix) * Math.min(1, dt * 0.35);
-  for (const k in zoneMix) zoneMix[k] += ((hereZone === k ? 1 : 0) - zoneMix[k]) * (1 - Math.exp(-dt / 0.7));
+  const hlx = ((car.pos.x % C) + C) % C, hlz = ((car.pos.z % C) + C) % C, inCourt = hereZone === 'density' && car.alt < 3 && hlx > LOT_A + 13 && hlx < LOT_B - 13 && hlz > LOT_A + 13 && hlz < LOT_B - 13;
+  for (const k in zoneMix) zoneMix[k] += (((k === 'court' ? inCourt : hereZone === k) ? 1 : 0) - zoneMix[k]) * (1 - Math.exp(-dt / 0.7));
   if (started && zoneMix.port > 0.5 && elapsed > nextClank) { nextClank = elapsed + 12 + Math.random() * 13; radio.clank(Math.random() * 1.6 - 0.8); }
   wallDepth += ((car.alt < 3 ? fieldDepth(car.pos.x, car.pos.z) : 0) - wallDepth) * (1 - Math.exp(-dt / 0.6));
   if (started) radio.atmos(zoneMix.newtown, wallDepth, zoneMix);
