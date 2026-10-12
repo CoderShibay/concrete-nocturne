@@ -1201,6 +1201,7 @@ const mats = {
   box0: containerMaterial(0x6e2f25), box1: containerMaterial(0x24415e), box2: containerMaterial(0x2f4a3a), box3: containerMaterial(0x55585c), box4: containerMaterial(0x7a5a22),   // rust, blue, green, grey, ochre
   glowm: glowMat(0xff8a2a, 0.3),                                                                      // the wide pool under a port light mast
   led: new THREE.MeshBasicMaterial({ color: 0x3d7a4a }),
+  hull: new THREE.MeshStandardMaterial({ color: 0x0b0c0e, roughness: 0.8 }),                          // the moored ship
   stele: new THREE.MeshStandardMaterial({ color: 0x2c2e32, roughness: 0.82 }),                        // Field of Blocks: smoother and bluer than the city's concrete
 };
 const floodHalo = new THREE.SpriteMaterial({ map: glowTex, color: 0xd6ecd0, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
@@ -1715,6 +1716,29 @@ function genCell(i, j) {
   } else if (zone === 'port') {
     // The Port: a container terminal that runs all night with nobody visible. Stacks like canyon walls, the only
     // colour in the city, and cranes that move on their own.
+    const basin = li === DS >> 1 && lj === DS >> 1;                             // one lot per district is water: the only water in the city
+    if (basin) {
+      ph = FLAT; hole = true;
+      const WY = -1.5, q0 = LOT_A, q1 = LOT_A + 2, q2 = LOT_B - 2, q3 = LOT_B, qm = (LOT_A + LOT_B) / 2;
+      addQuad(bk, 'glassDark', qm, qm, q2 - q1, q2 - q1, WY);                   // the water, 1.5 m below the quay
+      for (const [x0, x1, z0, z1] of [[q0, q3, q0, q1], [q0, q3, q2, q3], [q0, q1, q1, q2], [q2, q3, q1, q2]]) {   // a 2 m quay edge with a kerb: the car cannot drive in
+        addBox(bk, 'concrete', 'concrete', x1 - x0, ph - WY + 0.4, z1 - z0, (x0 + x1) / 2, (ph + WY - 0.4) / 2, (z0 + z1) / 2);
+        solids.push({ x0, x1, z0, z1, y0: 0, y1: 0.9 });
+      }
+      for (const [x0, x1, z0, z1] of [[q1 - 0.5, q2 + 0.5, q1 - 0.5, q1], [q1 - 0.5, q2 + 0.5, q2, q2 + 0.5], [q1 - 0.5, q1, q1, q2], [q2, q2 + 0.5, q1, q2]])
+        addBox(bk, 'concrete', 'concrete', x1 - x0, 0.9, z1 - z0, (x0 + x1) / 2, ph + 0.45, (z0 + z1) / 2);
+      for (let q = 38; q < 94; q += 8) for (const [bx, bz] of [[q, q0 + 0.7], [q, q3 - 0.7], [q0 + 0.7, q], [q3 - 0.7, q]]) addBox(bk, 'pole', 'pole', 0.5, 0.6, 0.5, bx, ph + 0.3, bz);   // mooring bollards
+      // the ship: 50 × 12 m, its deck 8 m above the water, six lit windows on each side of the stern house
+      const sx0 = 40, sx1 = 90, sz0 = 58, sz1 = 70, deck = WY + 8, szm = (sz0 + sz1) / 2;
+      addBox(bk, 'hull', 'hull', sx1 - sx0, 8.2, sz1 - sz0, (sx0 + sx1) / 2, WY + 3.9, szm);
+      addBox(bk, 'hull', 'hull', 10, 12, 12, sx0 + 5, deck + 6, szm);
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 2; b++) for (const e of [sz0 - 0.03, sz1 + 0.03]) addBox(bk, 'room', 'room', 1.4, 1.1, 0.06, sx0 + 2.4 + a * 2.6, deck + 4 + b * 4, e);
+      addBox(bk, 'pole', 'pole', 38, 0.05, 0.05, 71, deck + 3.2, szm);          // a string of eight deck lights
+      for (let k = 0; k < 8; k++) addBox(bk, 'lamp', 'lamp', 0.35, 0.25, 0.35, 54 + k * 5, deck + 3, szm);
+      for (const px of [52, 90]) addBox(bk, 'pole', 'pole', 0.2, 3.3, 0.2, px, deck + 1.65, szm);
+      addBox(bk, 'pole', 'pole', 0.3, 8, 0.3, sx0 + 5, deck + 16, szm); addBox(bk, 'beacon', 'beacon', 0.8, 0.8, 0.8, sx0 + 5, deck + 20, szm);
+      solids.push({ x0: sx0, x1: sx1, z0: sz0, z1: sz1, y0: WY, y1: deck }, { x0: sx0, x1: sx0 + 10, z0: sz0, z1: sz1, y0: deck, y1: deck + 12 });
+    } else {
     plinth(FLAT);
     const { l: CL, w: CW, h: CH, bays, groups } = CONTAINER, cols = [];
     for (let g = 0; g < 2; g++) for (let c = 0; c < 5; c++) for (let b = 0; b < 3; b++) {   // 30 columns, each 2 to 6 boxes high
@@ -1744,6 +1768,7 @@ function genCell(i, j) {
       buildGantry({ grp, extras, solids, ticks, rnd }, { mom: liftMom, box, x: lc.x, z: lc.z, rest: ph + lc.n * CH, wx: i * C + lc.x, wz: j * C + R });
       momentPos = new THREE.Vector3(i * C + lc.x, 0, j * C + R);
     } else if ((li + 2 * lj) % 3 === 0) buildGantry({ grp, extras, solids, ticks, rnd });
+    }
     lampOn = 0.8; sodium = true;
   } else if (zone === 'interchange') {
     // P9: elevated roads cross overhead on columns that stand only on the lots. They come out of one concrete
