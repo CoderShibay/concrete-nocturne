@@ -1408,7 +1408,7 @@ const director = { distanceDriven: 0, driveTime: 0, sinceLastMoment: 0, nextGap:
 // Moments: one small sign of other people at a time, 30–50 s apart (the rhythm). A moment is placed in the block
 // that is about to appear ahead of the car; it only counts once the car has actually passed it.
 const moments = { pending: false, active: null, cache: new Map(), lingering: [] };
-const MOMENT_FOR = { port: 'lift', density: 'flicker', corridor: 'bridge', office: 'sensor', boulevard: 'window', newtown: 'showflat', plaza: 'lamp', field: 'pacer', interchange: 'train', residential: 'silhouette', corner: 'diner', fog: 'lampsOff' };
+const MOMENT_FOR = { soon: 'lastroom', port: 'lift', density: 'flicker', corridor: 'bridge', office: 'sensor', boulevard: 'window', newtown: 'showflat', plaza: 'lamp', field: 'pacer', interchange: 'train', residential: 'silhouette', corner: 'diner', fog: 'lampsOff' };
 const districtZones = new Map();          // "di,dj" → zone, so returning to a district shows the same thing
 const DS = 12;                            // blocks per side of a district: about 1.1 km, 30-50 s of driving per zone
 const districtOf = v => Math.floor(v / DS);
@@ -1801,13 +1801,29 @@ function genCell(i, j) {
     if (kind === 'cut') {
       // one terrace still stands, with its road-facing wall gone for 30 m: five rooms on each of four floors, open to the street
       terrace(41, 71, 89); parapet(41);
+      const lastroom = mom && mom.type === 'lastroom' ? mom : null;
       addBox(bk, 'winOld', 'roof', 30, TH, 7, 56, ph + TH / 2, 48.5, same); facades.push({ x0: 41, x1: 71, z0: 45, z1: 52, y0: ph, y1: ph + TH + 0.8 });
       solids.push({ x0: 41, x1: 71, z0: 41, z1: 45, y0: 0, y1: ph + TH });
       for (let f = 0; f < 4; f++) addBox(bk, 'concrete', 'concrete', 30, 0.25, 4, 56, ph + 3.4 * f + 0.125, 43);   // floor slabs
       for (let k = 0; k < 5; k++) addBox(bk, 'concrete', 'concrete', 0.25, TH, 4, 41 + 6 * k + (k ? 0 : 0.125), ph + TH / 2, 43);   // party walls
       for (let f = 0; f < 4; f++) for (let k = 0; k < 5; k++) {
-        const x0 = 41 + 6 * k, fy = ph + 3.4 * f + 0.25, paper = 'paper' + Math.floor(rnd() * PAPERS.length);
+        const x0 = 41 + 6 * k, fy = ph + 3.4 * f + 0.25, lit = lastroom && f === 2 && k === 3, paper = lit ? 'room' : 'paper' + Math.floor(rnd() * PAPERS.length);
         addBox(bk, paper, paper, 5.75, 3.15, 0.06, x0 + 3, fy + 1.575, 44.96);                                     // each room kept its own wallpaper
+        if (lit) {
+          // moment: one room on the third floor still has its lamp on. A standing lamp, one chair, a picture. No figure.
+          // While you are near, the radio picks up another song from it, faintly.
+          addBox(bk, 'furn', 'furn', 0.05, 1.6, 0.05, x0 + 1.2, fy + 0.8, 43.6); addBox(bk, 'shade', 'shade', 0.4, 0.4, 0.4, x0 + 1.2, fy + 1.8, 43.6);
+          addBox(bk, 'furn', 'furn', 0.55, 0.95, 0.55, x0 + 3.4, fy + 0.475, 43.4); addBox(bk, 'furn', 'furn', 0.65, 0.5, 0.05, x0 + 4.6, fy + 2.0, 44.9);
+          addFlat(bk, 'glow', x0 + 3, 39, 10, ph + 0.05);                                                          // its light on the rubble below
+          const wx = i * C + x0 + 3, wz = j * C + 41, SONG = [67, 71, 74, 72, 71, 67, 69, 67]; let nextNote = 0, step = 0;
+          momentPos = new THREE.Vector3(wx, 0, wz);
+          ticks.push((dt, t) => {
+            if (moments.active !== lastroom || t < nextNote) return;
+            const d = Math.hypot(car.pos.x - wx, car.pos.z - wz);
+            if (d < 60) { radio.songNote(SONG[step++ % SONG.length], 1 - d / 60, panFor(wx, wz)); nextNote = t + 0.7; }
+          });
+          continue;
+        }
         if (rnd() < 0.6) addBox(bk, 'dark', 'dark', 0.9, 2, 0.05, x0 + 4.85, fy + 1, 44.9);                        // a door
         if (rnd() < 0.3) addBox(bk, 'pole', 'pole', 0.6, 0.45, 0.05, x0 + 1.85, fy + 1.9, 44.9);                   // a picture, still hanging
         if (k === (2 * f + 1) % 5) for (let st = 0; st < 5; st++) addBox(bk, 'concrete', 'concrete', 0.5, 0.3 * (st + 1), 1, x0 + 0.7 + 0.5 * st, fy + 0.15 * (st + 1), 44.4);   // one stair run per floor
@@ -2428,6 +2444,7 @@ function placeMoment(ci, cj) {
   let type = MOMENT_FOR[zone];
   if (type === 'window' && (li + lj) % 2) type = 'taillights';            // no tower on this block of the boulevard
   if (type === 'bridge' && Math.random() < 0.35) type = 'taillights';
+  if (type === 'lastroom' && soonKind(districtOf(ti), districtOf(tj), li, lj) !== 'cut') type = 'taillights';   // only a cut-open terrace has rooms to light
   if (type === 'lift' && li === DS >> 1 && lj === DS >> 1) type = 'taillights';   // the dock basin has no crane
   if (type === 'showflat') {
     if ((alongZ ? li : lj) % 3 === 2) type = 'taillights';                // this road only passes lots nobody has built on
@@ -3253,6 +3270,14 @@ const radio = {
     this.portG.gain.setTargetAtTime(0.02 * zm.port, t, 0.15); this.windG.gain.setTargetAtTime(0.02 * zm.soon, t, 0.15);   // 0.02 × a swell of 0.2 to 1 averages the 0.012 asked for
     this.densG.gain.setTargetAtTime((0.02 + 0.015 * zm.court) * zm.density, t, 0.15); this.rainDuck.gain.setTargetAtTime((1 - 0.6 * depth) * (1 - 0.3 * zm.court), t, 0.15);   // in a courtyard the murmur closes in and the rain backs off
     this.acG.gain.setTargetAtTime(0.01 * zm.density, t, 0.15);
+  },
+  songNote(n, vol, pan) { // one note of someone else's song, from a room you can't reach: a soft sine, far off
+    if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    o.type = 'sine'; o.frequency.value = this.mtof(n); f.type = 'lowpass'; f.frequency.value = 900;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.02 * vol, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+    o.connect(f); f.connect(g); if (p) { p.pan.value = pan; g.connect(p); p.connect(this.comp); p.connect(this.rev); } else { g.connect(this.comp); g.connect(this.rev); }
+    o.start(t); o.stop(t + 1.35);
   },
   hum(level, pan) {
     if (!this.full) return; const t = this.ctx.currentTime;
