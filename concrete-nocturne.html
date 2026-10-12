@@ -1014,9 +1014,7 @@ const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.4, 18
 
 const hemi = new THREE.HemisphereLight(0x4d5c78, 0x0d0b09, 0.7); scene.add(hemi);
 let flash = 0, flashQueue = [], nextThunder = 18, nextDistant = 35, fogMix = 0, nextWipe = 0, wallDepth = 0, nextClank = 0;
-// how far into each of these districts' own sound you are, 0 to 1. court: inside one of Density Wall's courtyards; song: within 60 m of Coming Soon's lit room
-const zoneMix = { newtown: 0, port: 0, density: 0, soon: 0, court: 0, song: 0 };
-let songNearT = -9;
+const zoneMix = { newtown: 0, port: 0, density: 0, soon: 0, court: 0 };   // court: inside one of Density Wall's courtyards   // how far into each of these districts' own sound you are, 0 to 1
 const moonLight = new THREE.DirectionalLight(0x9aa8ff, 0.35);
 moonLight.position.set(-0.4, 1, -0.6); scene.add(moonLight);
 
@@ -1834,10 +1832,9 @@ function genCell(i, j) {
           const wx = i * C + x0 + 3, wz = j * C + 41, SONG = [67, 71, 74, 72, 71, 67, 69, 67]; let nextNote = 0, step = 0;
           momentPos = new THREE.Vector3(wx, 0, wz);
           ticks.push((dt, t) => {
-            if (moments.active !== lastroom) return;
+            if (moments.active !== lastroom || t < nextNote) return;
             const d = Math.hypot(car.pos.x - wx, car.pos.z - wz);
-            if (d < 60) songNearT = t;                                                                           // the radio gives way to it
-            if (d < 60 && t >= nextNote) { radio.songNote(SONG[step++ % SONG.length], 1 - d / 60, panFor(wx, wz)); nextNote = t + 0.7; }
+            if (d < 60) { radio.songNote(SONG[step++ % SONG.length], 1 - d / 60, panFor(wx, wz)); nextNote = t + 0.7; }
           });
           continue;
         }
@@ -2887,7 +2884,7 @@ try {
 /* ---------- lo-fi radio (all generated live) ---------- */
 // Levels of the district sounds. They are set by measurement (node tools/measure-audio.js <zone>), not by ear or
 // from a spec: an ambience should sit about as loud as the rain, 8 to 10 dB under the music.
-const MIX = { tv: 0.34, tvCourt: 0.5, ac: 0.0155, wind: 0.19, port: 0.02, hum: 0.015 };
+const MIX = { tv: 0.34, tvCourt: 0.5, ac: 0.0155, wind: 0.02, port: 0.02, hum: 0.015 };
 const radio = {
   ctx: null, musicOn: true, rainOn: true,
   init() {
@@ -3293,18 +3290,18 @@ const radio = {
     // Field of Blocks (depth): as the walls rise beside you the radio, the rain and the engine all muffle.
     if (!this.ctx) return; const t = this.ctx.currentTime; this.depth = depth;
     this.tape.frequency.setTargetAtTime(2000 + 2800 * clean - 1500 * depth, t, 0.15); this.crackG.gain.setTargetAtTime(0.22 * (1 - 0.5 * clean), t, 0.15);
-    this.duck.gain.setTargetAtTime((1 - 0.5 * depth) * (1 - 0.3 * zm.port) * (1 - 0.25 * zm.density) * (1 - 0.2 * zm.soon - 0.2 * zm.song), t, 0.15);   // in the Port and in Density Wall something is always louder than the radio; in Coming Soon it gives way to the wind, and to the other song near the lit room
+    this.duck.gain.setTargetAtTime((1 - 0.5 * depth) * (1 - 0.3 * zm.port) * (1 - 0.25 * zm.density), t, 0.15);   // in the Port and in Density Wall something is always louder than the radio
     if (!this.full) return;
     this.rainDuck.gain.setTargetAtTime(1 - 0.6 * depth, t, 0.15);
-    this.portG.gain.setTargetAtTime(0.02 * zm.port, t, 0.15); this.windG.gain.setTargetAtTime(MIX.wind * zm.soon, t, 0.15);   // the level at the top of its swell
+    this.portG.gain.setTargetAtTime(0.02 * zm.port, t, 0.15); this.windG.gain.setTargetAtTime(0.02 * zm.soon, t, 0.15);   // 0.02 × a swell of 0.2 to 1 averages the 0.012 asked for
     this.densG.gain.setTargetAtTime((MIX.tv + (MIX.tvCourt - MIX.tv) * zm.court) * zm.density, t, 0.15); this.rainDuck.gain.setTargetAtTime((1 - 0.6 * depth) * (1 - 0.3 * zm.court), t, 0.15);   // in a courtyard the murmur closes in and the rain backs off
     this.acG.gain.setTargetAtTime(MIX.ac * zm.density, t, 0.15);
   },
-  songNote(n, vol, pan) { // one note of someone else's song, from a room you can't reach: a soft triangle wave, far off
+  songNote(n, vol, pan) { // one note of someone else's song, from a room you can't reach: a soft sine, far off
     if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-    o.type = 'triangle'; o.frequency.value = this.mtof(n); f.type = 'lowpass'; f.frequency.value = 900;
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.10 * vol, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+    o.type = 'sine'; o.frequency.value = this.mtof(n); f.type = 'lowpass'; f.frequency.value = 900;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.02 * vol, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
     o.connect(f); f.connect(g); if (p) { p.pan.value = pan; g.connect(p); p.connect(this.comp); p.connect(this.rev); } else { g.connect(this.comp); g.connect(this.rev); }
     o.start(t); o.stop(t + 1.35);
   },
@@ -3860,7 +3857,7 @@ function frame() {
   const hereZone = districtZones.get(districtOf(Math.floor(car.pos.x / C)) + ',' + districtOf(Math.floor(car.pos.z / C)));
   fogMix += ((hereZone === 'fog' ? 1 : 0) - fogMix) * Math.min(1, dt * 0.35);
   const hlx = ((car.pos.x % C) + C) % C, hlz = ((car.pos.z % C) + C) % C, inCourt = hereZone === 'density' && car.alt < 3 && hlx > LOT_A + 13 && hlx < LOT_B - 13 && hlz > LOT_A + 13 && hlz < LOT_B - 13;
-  for (const k in zoneMix) zoneMix[k] += (((k === 'court' ? inCourt : k === 'song' ? elapsed - songNearT < 0.3 : hereZone === k) ? 1 : 0) - zoneMix[k]) * (1 - Math.exp(-dt / 0.7));
+  for (const k in zoneMix) zoneMix[k] += (((k === 'court' ? inCourt : hereZone === k) ? 1 : 0) - zoneMix[k]) * (1 - Math.exp(-dt / 0.7));
   if (started && zoneMix.port > 0.5 && elapsed > nextClank) { nextClank = elapsed + 12 + Math.random() * 13; radio.clank(Math.random() * 1.6 - 0.8); }
   wallDepth += ((car.alt < 3 ? fieldDepth(car.pos.x, car.pos.z) : 0) - wallDepth) * (1 - Math.exp(-dt / 0.6));
   if (started) radio.atmos(zoneMix.newtown, wallDepth, zoneMix);
