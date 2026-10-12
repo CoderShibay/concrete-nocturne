@@ -1187,6 +1187,7 @@ function pitchMaterial() {
 const PITCH = 0.9, STAND_LIT = 0x566358;
 const OFFICE_LIT = 0xcfe3d2, FLOOD = 0xe6f2e2;
 const glowTex = radialTex('rgba(255,255,255,1)', 'rgba(255,255,255,0)');
+const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });   // something overhead, on the road
 const glowMat = (color, opacity) => new THREE.MeshBasicMaterial({ map: glowTex, color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 
 // Coming Soon: the wallpapers of rooms cut open to the weather, at night brightness: ochre, sage, dusty pink, pale blue, cream, brown
@@ -1234,6 +1235,7 @@ const mats = {
   hull: new THREE.MeshStandardMaterial({ color: 0x1c2733, roughness: 0.8, emissive: 0x1c2733, emissiveIntensity: HULL_LIT }),      // the moored ship; like the containers it carries a little of its own colour at night
   hullRed: new THREE.MeshStandardMaterial({ color: 0x5a2620, roughness: 0.8, emissive: 0x5a2620, emissiveIntensity: HULL_LIT }),   // its waterline band
   water: new THREE.MeshStandardMaterial({ color: 0x0a1118, roughness: 0.3, metalness: 0.5 }),
+  glowl: glowMat(0xd6ecd0, 0.85),                                                                     // the pool under the lift crane's trolley lamp: strong, so it shows from far down the road
   glowr: glowMat(0xff8a2a, 0.25),                                                                     // a light's reflection on the water
   stele: new THREE.MeshStandardMaterial({ color: 0x2c2e32, roughness: 0.82 }),                        // Field of Blocks: smoother and bluer than the city's concrete
 };
@@ -1539,20 +1541,29 @@ function buildGantry(c, lift) {
     return;
   }
   const CH = CONTAINER.h, mix = (a, b, k) => a + (b - a) * smooth(k), { zOut, carry } = GANTRY;
-  const pose = T => {                                                          // 4 s up, 5 s out, 2 s held over the road, 5 s back, 4 s down
-    const y = T < 4 ? mix(lift.rest, carry, T / 4) : T < 16 ? carry : mix(carry, lift.rest, (T - 16) / 4);
-    const z = T < 4 ? lift.z : T < 9 ? mix(lift.z, zOut, (T - 4) / 5) : T < 11 ? zOut : T < 16 ? mix(zOut, lift.z, (T - 11) / 5) : lift.z;
+  // so it can't be missed from the car: a lamp under the trolley throws a pool of light on the ground that travels with
+  // the container, and the container's shadow lies inside it
+  addBox(tb, 'fluo', 'fluo', 1.6, 0.12, 1.6, 0, top - 1.26, 0); mesh(trolley, { fluo: tb.fluo });
+  const pg = new THREE.PlaneGeometry(18, 18), sg = new THREE.PlaneGeometry(CONTAINER.l, 2.6);   // 18 m, not 10: at 10 m the shadow covered most of the pool
+  const pool = new THREE.Mesh(pg, mats.glowl), shade = new THREE.Mesh(sg, shadowMat);
+  pool.rotation.x = shade.rotation.x = -Math.PI / 2; pool.position.y = 0.08; shade.position.y = 0.1; pool.renderOrder = 1; shade.renderOrder = 2;
+  trolley.add(pool, shade); extras.push(pg, sg);
+  let holdEnd = 15;                                                            // it waits over the road until you have passed under it, 6 s at most
+  const pose = T => {                                                          // 4 s up, 5 s out, held over the road, 5 s back, 4 s down
+    const b = T - holdEnd, y = T < 4 ? mix(lift.rest, carry, T / 4) : b < 5 ? carry : mix(carry, lift.rest, (b - 5) / 4);
+    const z = T < 4 ? lift.z : T < 9 ? mix(lift.z, zOut, (T - 4) / 5) : b < 0 ? zOut : b < 5 ? mix(zOut, lift.z, b / 5) : lift.z;
     lift.box.position.set(lift.x, y, z); place(lift.x, z); hangAt(y + CH);
   };
-  let T = -1, told = false; pose(0);
+  let T = -1, told = false, side = 0; pose(0);
   ticks.push(dt => {
-    const d = Math.hypot(car.pos.x - lift.wx, car.pos.z - lift.wz);
-    if (T < 0) { if (d < 120) T = 0; return; }
-    if (T < 20) {
-      T = Math.min(20, T + dt); pose(T);
-      if (T === 20) { radio.clank(panFor(lift.wx, lift.wz), 1.5); radio.trainHorn(0.5, 0.5); }   // it sets down; a ship's horn, far off
+    const d = Math.hypot(car.pos.x - lift.wx, car.pos.z - lift.wz), end = holdEnd + 9;
+    if (T < 0) { if (d < 180) { T = 0; side = Math.sign(car.pos.x - lift.wx) || 1; } return; }
+    if (T >= 10 && T < holdEnd && Math.sign(car.pos.x - lift.wx) === -side) holdEnd = T;   // you have gone under it
+    if (T < end) {
+      T = Math.min(holdEnd + 9, T + dt); pose(T);
+      if (T === holdEnd + 9) { radio.clank(panFor(lift.wx, lift.wz), 1.5); radio.trainHorn(0.5, 0.5); }   // it sets down; a ship's horn, far off
     }
-    if (!told && (T === 20 || d > 200)) { told = true; if (moments.active === lift.mom) momentDone(true); }
+    if (!told && (T === holdEnd + 9 || d > 200)) { told = true; if (moments.active === lift.mom) momentDone(true); }
   });
   return { crane, trolley, hangAt, place };
 }
@@ -3367,7 +3378,7 @@ function setDay(d) {
   mats.lamp.color.setHex(L.lamp); mats.lampv.color.setHex(L.lampv);
   headlight.intensity = d ? 0 : HEADLIGHT;
   mats.officeLit.color.setHex(d ? 0x39403c : OFFICE_LIT);          // by day the office lights don't show through the glass
-  for (const k of ['glow', 'glowv', 'glowc', 'glowd', 'glowf', 'glowm', 'glowr']) mats[k].visible = !d;
+  for (const k of ['glow', 'glowv', 'glowc', 'glowd', 'glowf', 'glowm', 'glowr', 'glowl']) mats[k].visible = !d;
   for (let k = 0; k < 5; k++) mats['box' + k].emissiveIntensity = d ? 0 : BOX_LIT;
   mats.hull.emissiveIntensity = mats.hullRed.emissiveIntensity = d ? 0 : HULL_LIT;
   mats.glowp.opacity = d ? 0.3 : PITCH; mats.standlit.color.setHex(d ? 0x5c5e5d : STAND_LIT);   // by day the pitch is only its lines, the stands plain concrete
