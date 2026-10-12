@@ -93,6 +93,14 @@ about to appear ahead. It only counts once you have passed it; turn away and it 
   about 1 a.m., drums by 3, and by 4 there is mostly just the rain.
 - **Inside the car:** rain on the roof, spray off wet tyres, the wipers.
 - **Far away:** a siren, a train horn, a dog, wind between the towers, thunder. One at a time.
+- **Districts with their own sound**, each about as loud as the rain, and the radio steps back for them:
+  - Office Park: a mains hum beside a lit floor.
+  - Never Lived In: the radio's tape filter opens, so it sounds too clean.
+  - Field of Blocks: the radio, rain and engine muffle as the walls rise.
+  - The Port: a machinery drone, a slow whine, clanks.
+  - Density Wall: a murmur of televisions and an air-conditioner hum, closer in a courtyard.
+  - Coming Soon: wind through the opened buildings, and another song from the one lit room.
+- District sound levels are set by measurement: `node tools/measure-audio.js <zone>` prints each layer in dB.
 - If the browser pauses the sound (Safari does when you switch tabs), any click or key wakes it.
   The Music button says "Sound paused · click" or "Sound failed · see console" when there is none.
 
@@ -115,6 +123,9 @@ Codex and AGY, each built from the same palette.
 | `DISTRICT_CONCEPTS.md` | Twelve district ideas drawn from the research. Six are built (see below); six are not. |
 | `DISTRICTS_BATCH_1.md`, `wireframes/batch-1.html` | The build spec and approved layout drawings for Office Park, Never Lived In and Field of Blocks. |
 | `DISTRICTS_BATCH_2.md`, `wireframes/batch-2.html` | The same for the Port, Density Wall and Coming Soon. |
+| `FIXES_BATCH_2.md` | The fix list after the batch 2 review (sound levels, bloom, gate, ship, lift moment). Done. |
+| `tools/measure-audio.js` | Measures how loud each sound layer is in a district, in dB. |
+| `tools/shoot.js` | Takes a standard set of screenshots of `play.html`. |
 | `ships/SHIP_DESIGN_SPEC.md` | The brief and code contract for the spaceship designs. |
 | `ships/codex-ships.js`, `ships/agy-ships.js` | Three ships each by Codex and AGY, embedded in the game unchanged. |
 | `autotest.html` | Generated headless-test copy; gitignored. |

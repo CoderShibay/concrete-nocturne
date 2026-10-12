@@ -3,6 +3,13 @@
 Written by the design agent for the build session, against commit `419a2f5` (2026-10-12).
 Approved by Ali on 2026-10-12, including the bloom change.
 
+> **Status: DONE on 2026-10-12** (commits `c977f84` to the E1 commit, one per fix). Where the build differs from this list:
+> - **A2:** the tool's 3-second window falls in the trough of the wind's 11-second swell, so it prints about −40 dB; the top of the swell measures −33.5 dB.
+> - **A5:** Field of Blocks only dropped the music 5.3 dB, so the duck was deepened; it now drops 7.5 dB. Never Lived In was left alone: its level does not change, only 0.1% → 0.6% of its energy above 2.5 kHz.
+> - **B2:** lit rooms stop at 58%, not 65% (the sales pavilion went near-white at 65%). The other four reached their targets.
+> - **B3:** headlight falloff is 1.5.
+> - **D2:** the pool under the trolley is 18 m at 85%, not 10 m at 30%; at 10 m the shadow covered most of it.
+
 **How to work:** make a checkpoint commit first. Then do the sections in order: one commit per numbered fix, pushed. Screenshot before and after each visual fix into `../Screenshots/Fixes batch 2/`.
 
 ---
