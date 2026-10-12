@@ -6,7 +6,24 @@ Written by the design agent for the build session, against commit `cd188bb` (202
 Concepts and research sources: `DISTRICT_CONCEPTS.md` (#5, #8, #2). Rules: `LONELY_CITY_BRIEF.md`.
 Wireframes: `wireframes/batch-2.html`.
 
-> **Status: APPROVED by Ali on 2026-10-12. Ready to build.** The wireframes and the four decisions below are final.
+> **Status: BUILT on 2026-10-12** (commits `6831eeb` to `e64fa36`). Approved by Ali on 2026-10-12. The wireframes and the four decisions below are final.
+>
+> **Where the build differs from this spec:**
+> - **The Port**
+>   - Containers carry 28% of their own colour as light at night; with only ambient light the stacks were black from the road.
+>   - Crane legs do not block the car (they block the spaceship), so a creeping crane never closes a gap.
+>   - The lift crane's beam reaches z 12, not z 22, so the container hangs over the middle of the road (the drawing has the trolley at z 15).
+>   - The lift crane stands still and does not creep. The ship's hull is a near-black lit material, not `dark`. It has six lit windows on each side of the stern house.
+>   - The basin lot has no light masts (they would stand in the water).
+> - **Density Wall**
+>   - Lit windows are at 70% strength. Its low floors do not go dark first, as they do in other districts; otherwise the street level was nearly dark at 04:00.
+>   - The lintel's windows start at 9.6 m (three floors up) with a plain beam from 7 m, so window rows line up. The gate is still 9 × 7 m.
+>   - The shutter band is a dark lit material, not `dark`. The map has no gate notch.
+> - **Coming Soon**
+>   - The hoarding is `#23262a`, not `#4a4d52`, which turned white in the headlight.
+>   - The crown sign ignores fog. The tower is only built within three blocks of the car, so it cannot be seen from every cleared street.
+>   - Terraces always run along x, whichever way the demolition crosses the district.
+>   - Wallpapers are 2.3 times brighter by day.
 >
 > **Decisions:**
 > 1. Coming Soon: demolition in **three bands** across the district.
