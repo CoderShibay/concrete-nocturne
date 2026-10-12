@@ -1435,6 +1435,42 @@ function directorTick(dt) {
   director.musicDensity = director.litFraction;
 }
 
+// 0 → len → 0 at speed v, waiting `pause` seconds at each end
+function pingPong(t, len, v, pause) {
+  const run = len / v, per = 2 * (run + pause), q = ((t % per) + per) % per;
+  return q < run ? q * v : q < run + pause ? len : q < 2 * run + pause ? len - (q - run - pause) * v : 0;
+}
+// A gantry crane over the Port's stacks, on rails at z 44 and z 86. It is always working: the trolley runs along the
+// beam, the whole crane creeps along its rails, a spreader hangs under the trolley, and the cab is lit and empty.
+const GANTRY = { top: 24, hw: 5, z0: 43, z1: 87.6, hang: 16.8 };
+function buildGantry(c) {
+  const { grp, extras, solids, ticks, rnd } = c, { top, hw, z0, z1, hang } = GANTRY;
+  const crane = new THREE.Group(), trolley = new THREE.Group(); crane.add(trolley); grp.add(crane);
+  const mesh = (parent, bkt) => { const out = []; for (const k in bkt) { const g = geoOf(bkt[k]), m = new THREE.Mesh(g, mats[k]); parent.add(m); extras.push(g); out.push(m); } return out; };
+  const sb = {}, legs = [];
+  for (const lz of [44, 86]) {                                                 // two portal frames, open underneath
+    for (const lx of [-hw, hw]) { addBox(sb, 'pole', 'pole', 0.9, top, 0.9, lx, top / 2, lz); const so = { x0: 0, x1: 0, z0: lz - 0.45, z1: lz + 0.45, y0: 2.2, y1: top, lx }; legs.push(so); solids.push(so); }   // solid to the spaceship only: a creeping leg must never close a gap to the car
+    addBox(sb, 'pole', 'pole', 2 * hw + 0.9, 1, 0.9, 0, top - 0.5, lz); addBox(sb, 'pole', 'pole', 2 * hw + 0.9, 0.6, 0.6, 0, 9, lz);
+  }
+  addBox(sb, 'roof', 'roof', 2, 2.5, z1 - z0, 0, top + 1.25, (z0 + z1) / 2);   // the beam across the top
+  const beam = { x0: 0, x1: 0, z0, z1, y0: top, y1: top + 2.5, lx: 0, hw: 1 }; solids.push(beam);
+  mesh(crane, sb);
+  const tb = {};
+  addBox(tb, 'pole', 'pole', 2.4, 1.2, 3, 0, top - 0.6, 0);                    // trolley
+  addBox(tb, 'roof', 'roof', 2.4, 2.4, 3, 0, top - 1.8, 3.7); addBox(tb, 'room', 'room', 2.5, 1.1, 3.1, 0, top - 1.5, 3.7);   // the cab beside it: a dim warm window, nobody inside
+  mesh(trolley, tb);
+  const sp = {}; addBox(sp, 'pole', 'pole', 12, 0.3, 2.6, 0, 0.15, 0);
+  const spreader = mesh(trolley, sp)[0];
+  const cb = {}; for (const cz of [-0.8, 0.8]) addBox(cb, 'pole', 'pole', 0.07, 1, 0.07, 0, -0.5, cz);   // two thin cables, stretched to fit
+  const cables = mesh(trolley, cb)[0]; cables.position.y = top - 1.2;
+  const hangAt = y => { spreader.position.y = y; cables.scale.y = top - 1.2 - (y + 0.3); };
+  const place = (x, z) => { crane.position.x = x; trolley.position.z = z; for (const so of legs) { so.x0 = x + so.lx - 0.45; so.x1 = x + so.lx + 0.45; } beam.x0 = x - 1; beam.x1 = x + 1; };
+  const p1 = rnd() * 400, p2 = rnd() * 200;
+  hangAt(hang); place(65, 65);
+  ticks.push((dt, t) => place(45 + pingPong(t + p1, 40, 0.4, 3), 47 + pingPong(t + p2, 36, 1.2, 4)));
+  return { crane, trolley, hangAt, place };
+}
+
 /* ---------- city cell generator ---------- */
 function genCell(i, j) {
   const di = districtOf(i), dj = districtOf(j), zone = zoneFor(di, dj);
@@ -1678,6 +1714,8 @@ function genCell(i, j) {
       addFlat(bk, 'glowm', mx, mz, 44, ph + 0.04);
       solids.push({ x0: mx - 0.4, x1: mx + 0.4, z0: mz - 0.4, z1: mz + 0.4, y0: 0, y1: ph + 30 });
     }
+    for (const rz of [44, 86]) addBox(bk, 'pole', 'pole', 50, 0.05, 0.3, 65, ph + 0.03, rz);     // crane rails
+    if ((li + 2 * lj) % 3 === 0) buildGantry({ grp, extras, solids, ticks, rnd });
     lampOn = 0.8; sodium = true;
   } else if (zone === 'interchange') {
     // P9: elevated roads cross overhead on columns that stand only on the lots. They come out of one concrete
