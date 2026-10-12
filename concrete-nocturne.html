@@ -2603,7 +2603,7 @@ function profileGeo(pts, width, bevel = 0.05) {
   }
   add(new THREE.CylinderGeometry(0.035, 0.035, 0.3, 8).rotateX(Math.PI / 2), black, -0.5, 0.26, 2.3);   // exhaust pipe
   // lights: one real headlight down the road (on at night, off by day), a warm cabin, red on the wet tarmac behind
-  const head = headlight = new THREE.SpotLight(0xfff0d6, HEADLIGHT, 90, 0.5, 0.6, 1.1); head.position.set(0, 0.64, -2.3);
+  const head = headlight = new THREE.SpotLight(0xfff0d6, HEADLIGHT, 90, 0.5, 0.6, 1.5); head.position.set(0, 0.64, -2.3);
   head.target.position.set(0, 0, -22); carMesh.add(head); carMesh.add(head.target);
   const tail = new THREE.PointLight(0xff2a1e, 0.8, 7, 2); tail.position.set(0, 0.7, 2.9); carMesh.add(tail);
   // booster: a short orange flame from the exhaust
