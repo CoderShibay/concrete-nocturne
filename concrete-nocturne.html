@@ -3893,8 +3893,8 @@ async function boot() {
   openTex = signTexture('OPEN', '#ff8a3a', false);
   pylonMats = NEWTOWN_ADS.map(l => { const am = new THREE.MeshBasicMaterial({ map: adTexture(l), color: 0x9c9890 }); return [mats.dark, mats.dark, mats.dark, mats.dark, am, am]; });
   showFlatMat = new THREE.MeshBasicMaterial({ map: cardTexture('SHOW FLAT'), color: 0xb0aa9c });
-  soonAdMats = SOON_ADS.map(l => { const am = new THREE.MeshBasicMaterial({ map: soonAdTexture(l), color: 0x737373 }); return [mats.dark, mats.dark, mats.dark, mats.dark, am, am]; });   // 45%
-  crownMat = new THREE.MeshBasicMaterial({ map: crownTexture('THE RESIDENCES'), color: 0x737373, fog: false });   // read through the haze, like the stadium floodlights
+  soonAdMats = SOON_ADS.map(l => { const am = new THREE.MeshBasicMaterial({ map: soonAdTexture(l), color: 0x999999 }); return [mats.dark, mats.dark, mats.dark, mats.dark, am, am]; });   // 60%
+  crownMat = new THREE.MeshBasicMaterial({ map: crownTexture('THE RESIDENCES'), color: 0x999999, fog: false });   // read through the haze, like the stadium floodlights
   officeSignMats = OFFICE_SIGNS.map(t => new THREE.MeshBasicMaterial({ map: officeSignTexture(t), color: 0x9aa39c }));
   updateCells(); pumpCells(999);
   frame();
