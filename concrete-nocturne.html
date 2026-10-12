@@ -1228,6 +1228,7 @@ const mats = {
   box0: containerMaterial(0x6e2f25), box1: containerMaterial(0x24415e), box2: containerMaterial(0x2f4a3a), box3: containerMaterial(0x55585c), box4: containerMaterial(0x7a5a22),   // rust, blue, green, grey, ochre
   glowm: glowMat(0xff8a2a, 0.3),                                                                      // the wide pool under a port light mast
   led: new THREE.MeshBasicMaterial({ color: 0x3d7a4a }),
+  hoard: new THREE.MeshStandardMaterial({ color: 0x23262a, roughness: 0.95 }),                        // site hoarding: darker than drawn, or the headlight turns it white
   hull: new THREE.MeshStandardMaterial({ color: 0x0b0c0e, roughness: 0.8 }),                          // the moored ship
   stele: new THREE.MeshStandardMaterial({ color: 0x2c2e32, roughness: 0.82 }),                        // Field of Blocks: smoother and bluer than the city's concrete
 };
@@ -1275,6 +1276,28 @@ function cardTexture(text) {
   const W = 256, H = 88, c = mkCanvas(W, H), x = c.getContext('2d');
   x.fillStyle = '#ece6da'; x.fillRect(0, 0, W, H); x.fillStyle = '#26221e'; x.textAlign = 'center'; x.textBaseline = 'middle';
   x.font = '700 38px "Helvetica Neue",Arial,sans-serif'; x.fillText(text, W / 2, H / 2 + 2);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = aniso; return t;
+}
+// Coming Soon: billboards over the rubble, each a pale glass tower on a dusk sky, and the finished tower's crown sign
+const SOON_ADS = [['LUXURY LIVING', 'COMING SOON'], ['THE RESIDENCES'], ['A NEW WAY', 'TO LIVE'], ['REGISTER', 'YOUR INTEREST']];
+let soonAdMats = [], crownMat = null;
+const billGeo = new THREE.BoxGeometry(8, 4, 0.3);
+function soonAdTexture(lines) {
+  const W = 512, H = 256, c = mkCanvas(W, H), x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#2c3350'); g.addColorStop(0.65, '#8a6a6a'); g.addColorStop(1, '#d09a6a');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#d9e0e6'; x.fillRect(372, 26, 74, 230); x.fillStyle = '#9fb0c0'; for (let yy = 34; yy < 250; yy += 12) x.fillRect(378, yy, 62, 5);
+  x.fillStyle = '#f2ede4'; x.textAlign = 'left'; x.textBaseline = 'alphabetic';
+  let fs = 46; x.font = `600 ${fs}px "Helvetica Neue",Arial,sans-serif`;
+  while (Math.max(...lines.map(l => x.measureText(l).width)) > 330 && fs > 18) { fs -= 2; x.font = `600 ${fs}px "Helvetica Neue",Arial,sans-serif`; }
+  lines.forEach((l, k) => x.fillText(l, 26, 110 + k * (fs + 8)));
+  x.fillRect(26, 190, 50, 4);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = aniso; return t;
+}
+function crownTexture(text) {
+  const W = 512, H = 128, c = mkCanvas(W, H), x = c.getContext('2d');
+  x.fillStyle = '#10151a'; x.fillRect(0, 0, W, H); x.fillStyle = '#f2ede4'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = '600 50px "Helvetica Neue",Arial,sans-serif'; x.fillText(text, W / 2, H / 2 + 3);
   const t = new THREE.CanvasTexture(c); t.anisotropy = aniso; return t;
 }
 // Office Park: a low lit sign by the road corner of every lot. Only the text changes.
@@ -1793,6 +1816,40 @@ function genCell(i, j) {
       rubble(42, 70, 35.5, 39.5, 2 + Math.floor(rnd() * 2), 1.1);               // and a strip in front of the cut face
       addBox(bk, 'pole', 'pole', 0.25, 8, 0.25, 38, ph + 4, 38); addBox(bk, 'fluo', 'fluo', 0.9, 0.3, 0.5, 38.3, ph + 8, 38.3);   // a site floodlight aimed at the open rooms
       addFlat(bk, 'glowf', 54, 39, 22, ph + 0.04); solids.push({ x0: 37.7, x1: 38.3, z0: 37.7, z1: 38.3, y0: 0, y1: 8 });
+    }
+    if (kind === 'cleared') {
+      // cleared ground behind a hoarding: rubble, billboards for what is coming, a crane on one lot in four
+      for (let k = 0; k < 3; k++) { const cx = 46 + rnd() * 38, cz = 46 + rnd() * 38; rubble(cx - 5, cx + 5, cz - 4, cz + 4, 4 + Math.floor(rnd() * 3), 1.8); }
+      const HZ = LOT_A + 0.6;                                                   // hoarding 2.4 m high along both road sides, with an 8 m gate gap in each so the lot stays drivable
+      for (const [u0, u1] of [[HZ, 61], [69, LOT_B]]) {
+        addBox(bk, 'hoard', 'hoard', u1 - u0, 2.4, 0.2, (u0 + u1) / 2, ph + 1.2, HZ); solids.push({ x0: u0, x1: u1, z0: HZ - 0.1, z1: HZ + 0.1, y0: 0, y1: 2.4 });
+        addBox(bk, 'hoard', 'hoard', 0.2, 2.4, u1 - u0, HZ, ph + 1.2, (u0 + u1) / 2); solids.push({ x0: HZ - 0.1, x1: HZ + 0.1, z0: u0, z1: u1, y0: 0, y1: 2.4 });
+      }
+      for (const alongX of [true, false]) for (const u of [47.5, 82.5]) {       // two 8 × 4 m billboards behind the hoarding on each road side
+        const bd = new THREE.Mesh(billGeo, soonAdMats[Math.floor(rnd() * soonAdMats.length)]), o = HZ + 2;
+        bd.position.set(alongX ? u : o, ph + 5, alongX ? o : u); bd.rotation.y = alongX ? 0 : Math.PI / 2; grp.add(bd);
+        for (const du of [-3, 3]) { const px = alongX ? u + du : o, pz = alongX ? o : u + du; addBox(bk, 'pole', 'pole', 0.25, 3.2, 0.25, px, ph + 1.6, pz); solids.push({ x0: px - 0.2, x1: px + 0.2, z0: pz - 0.2, z1: pz + 0.2, y0: 0, y1: 3 }); }
+      }
+      if ((li + 2 * lj) % 4 === 0) {                                            // a tower crane: 48 m mast, 40 m jib, 12 m counter-jib, a red light on top
+        const jx = rnd() < 0.5, js = rnd() < 0.5 ? 1 : -1;
+        addBox(bk, 'pole', 'pole', 1.6, 48, 1.6, 70, ph + 24, 70); solids.push({ x0: 69.2, x1: 70.8, z0: 69.2, z1: 70.8, y0: 0, y1: 48 });
+        addBox(bk, 'pole', 'pole', jx ? 52 : 1.2, 1.2, jx ? 1.2 : 52, 70 - (jx ? js * 14 : 0), ph + 48.6, 70 - (jx ? 0 : js * 14));
+        addBox(bk, 'roof', 'roof', jx ? 4 : 2.4, 2, jx ? 2.4 : 4, 70 + (jx ? js * 10 : 0), ph + 47.4, 70 + (jx ? 0 : js * 10));       // counterweight
+        addBox(bk, 'pole', 'pole', 0.06, 18, 0.06, 70 - (jx ? js * 26 : 0), ph + 39, 70 - (jx ? 0 : js * 26));                          // the hook line, hanging still
+        addBox(bk, 'beacon', 'beacon', 0.9, 0.9, 0.9, 70, ph + 49.8, 70);
+      }
+    }
+    if (kind === 'tower') {
+      // the finished tower: 210 m of dark glass with a lit lobby and its name at the top. Sold, not lived in.
+      const t0 = 52, t1 = 78, tm = 65, TT = 210;
+      addBox(bk, 'glassDark', 'roof', 26, TT - 6, 26, tm, ph + 6 + (TT - 6) / 2, tm);
+      addBox(bk, 'room', 'roof', 25.2, 5.6, 25.2, tm, ph + 3, tm); addBox(bk, 'roof', 'roof', 26, 0.2, 26, tm, ph + 0.1, tm);        // the lobby: a dim warm wall behind the glass line
+      for (let q = -13; q <= 13.01; q += 26 / 6) for (const e of [-12.95, 12.95]) { addBox(bk, 'pole', 'pole', 0.14, 6, 0.14, tm + q, ph + 3, tm + e); addBox(bk, 'pole', 'pole', 0.14, 6, 0.14, tm + e, ph + 3, tm + q); }
+      addBox(bk, 'furn', 'furn', 4, 1.1, 0.3, tm, ph + 0.75, t0 + 0.2); addBox(bk, 'furn', 'furn', 0.3, 1.1, 4, t0 + 0.2, ph + 0.75, tm);   // a reception desk on each road face, nobody at it
+      facades.push({ x0: t0, x1: t1, z0: t0, z1: t1, y0: ph, y1: ph + TT }); roofs.push({ x: tm, z: tm, w: 26, d: 26, y: ph + TT });
+      for (const [px, pz, ry] of [[tm, t0 - 0.1, Math.PI], [t0 - 0.1, tm, -Math.PI / 2], [tm, t1 + 0.1, 0], [t1 + 0.1, tm, Math.PI / 2]].slice(0, 2)) {
+        const cr = new THREE.Mesh(planeGeo, crownMat); cr.scale.set(14, 3.5, 1); cr.position.set(px, ph + TT - 5, pz); cr.rotation.y = ry; grp.add(cr);   // THE RESIDENCES, on the two road faces
+      }
     }
     lampOn = 0.4; sodium = true;                                                // old lamps; many dead
   } else if (zone === 'density') {
@@ -3804,6 +3861,8 @@ async function boot() {
   openTex = signTexture('OPEN', '#ff8a3a', false);
   pylonMats = NEWTOWN_ADS.map(l => { const am = new THREE.MeshBasicMaterial({ map: adTexture(l), color: 0x9c9890 }); return [mats.dark, mats.dark, mats.dark, mats.dark, am, am]; });
   showFlatMat = new THREE.MeshBasicMaterial({ map: cardTexture('SHOW FLAT'), color: 0xb0aa9c });
+  soonAdMats = SOON_ADS.map(l => { const am = new THREE.MeshBasicMaterial({ map: soonAdTexture(l), color: 0x737373 }); return [mats.dark, mats.dark, mats.dark, mats.dark, am, am]; });   // 45%
+  crownMat = new THREE.MeshBasicMaterial({ map: crownTexture('THE RESIDENCES'), color: 0x737373, fog: false });   // read through the haze, like the stadium floodlights
   officeSignMats = OFFICE_SIGNS.map(t => new THREE.MeshBasicMaterial({ map: officeSignTexture(t), color: 0x9aa39c }));
   updateCells(); pumpCells(999);
   frame();
