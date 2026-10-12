@@ -5,7 +5,13 @@
 Written by the design agent for the build session, against commit `def4eeb` (2026-10-11).
 Concepts and research sources: `DISTRICT_CONCEPTS.md` (#4, #3, #6). Rules: `LONELY_CITY_BRIEF.md`.
 
-> **Status: APPROVED by Ali on 2026-10-12. Ready to build.** The wireframes (`wireframes/batch-1.html`) and the four decisions below are final.
+> **Status: BUILT on 2026-10-12** (commits `b3cc5ab` to `cd188bb`, then review fixes in `bfff9ad`). Approved by Ali on 2026-10-12. The wireframes (`wireframes/batch-1.html`) and the four decisions below are final.
+>
+> **Where the build differs from this spec:**
+> - Headlight: 2.2 strength and 90 m reach (the car already had one; the 1.2 / 70 m here was too dim), plus a soft light around the car between the slabs.
+> - Field of Blocks: the bowl's steepest slope is 12%, not 7% (a 2.2 m dip does not fit at 7%). The chase camera smooths over 0.2 s. The other car carries a small real light.
+> - Office Park: three panel bands, so the building is 11.4 m. The sensor watches the building and the near row of bays.
+> - Never Lived In: the pitch is a lit 60 × 40 m field with white lines, the stands' inner faces are lit, and the floodlights ignore fog. The sales pavilion is a lit room with furniture and window frames. Dark glass is rougher (0.55). Sapling crowns are dark green.
 >
 > **Decisions:**
 > 1. Built by the build session, from this file.
