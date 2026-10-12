@@ -2864,7 +2864,7 @@ try {
 /* ---------- lo-fi radio (all generated live) ---------- */
 // Levels of the district sounds. They are set by measurement (node tools/measure-audio.js <zone>), not by ear or
 // from a spec: an ambience should sit about as loud as the rain, 8 to 10 dB under the music.
-const MIX = { tv: 0.34, tvCourt: 0.5, ac: 0.0155, wind: 0.19, port: 0.0179, hum: 0.015 };
+const MIX = { tv: 0.34, tvCourt: 0.5, ac: 0.0155, wind: 0.19, port: 0.0179, hum: 0.0165 };
 const radio = {
   ctx: null, musicOn: true, rainOn: true,
   init() {
@@ -2975,7 +2975,7 @@ const radio = {
 
     // the hum of a lit office floor: mains and its octave, panned to the building
     this.humG = ctx.createGain(); this.humG.gain.value = 0; this.humP = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-    for (const f of [100, 200]) { const o = ctx.createOscillator(); o.frequency.value = f; o.connect(this.humG); o.start(); }
+    for (const [f, lv] of [[100, 1], [200, 1], [400, 0.5]]) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; g.gain.value = lv; o.connect(g); g.connect(this.humG); o.start(); }
     if (this.humP) { this.humG.connect(this.humP); this.humP.connect(comp); } else this.humG.connect(comp);
 
     // The Port: a low machinery drone and a slow whine, always on somewhere behind the stacks
@@ -3288,7 +3288,7 @@ const radio = {
   },
   hum(level, pan) {
     if (!this.full) return; const t = this.ctx.currentTime;
-    this.humG.gain.setTargetAtTime(0.015 * level, t, 0.3); if (this.humP) this.humP.pan.setTargetAtTime(pan, t, 0.2);
+    this.humG.gain.setTargetAtTime(MIX.hum * level, t, 0.3); if (this.humP) this.humP.pan.setTargetAtTime(pan, t, 0.2);
   },
   click(pan, v = 1) { // a relay somewhere as a lamp goes out
     if (!this.full) return; const ctx = this.ctx, t = ctx.currentTime, s2 = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
