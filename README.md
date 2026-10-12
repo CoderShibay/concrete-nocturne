@@ -36,7 +36,8 @@ On a phone, touch buttons replace the keys.
 The city is endless and built block by block around the car (100 m blocks with 30 m, six-lane roads;
 12×12 blocks to a district, so each zone lasts about 30–50 seconds of driving). Buildings stand 7 m back
 inside their lots and every lot is flush paving, so you can drive anywhere a building isn't. Hit a wall and
-the car turns along it and slides off instead of stopping dead.
+the car turns along it and slides off instead of stopping dead. In the Field of Blocks the lots sink into
+a bowl and the car follows the ground down.
 
 A small **director** decides what each new district becomes and when something happens.
 
@@ -47,8 +48,11 @@ Zones are remembered, so driving back shows the same blocks.
 | Zone | What it is |
 |---|---|
 | Slab Corridor | Identical twin slabs block after block, dim empty sky bridges between them |
+| Office Park | The same low glass office at the back of every lot, behind a painted car park with nobody parked; some floors lit all night on timers |
 | Boulevard | One huge tower on every other block; open forecourts with spiked ledges, armrest benches and ads selling to nobody |
+| Never Lived In | A finished new town: identical tower pairs with no window ever lit, every lamp working, every third row of lots still empty, sales pavilions, and a floodlit stadium with nobody in it |
 | Plaza | Empty, fenced ground; one monument lost in the haze |
+| Field of Blocks | Every lot filled with plain concrete slabs that rise as the ground sinks, until the walls beside you are about 8.5 m and the city is gone; the radio, rain and engine muffle as you go in |
 | Interchange | Elevated roads overhead that come out of one portal and go into another; green signs to places you never reach; parked cars with nobody in them |
 | Residential Wall | Housing slabs, most windows dark; sometimes a locked gate in front of a lit courtyard |
 | Corner | The ordinary city at human scale; the only street-level neon, often half dead or blinking OPEN |
@@ -60,8 +64,11 @@ about to appear ahead. It only counts once you have passed it; turn away and it 
 | Zone | Moment |
 |---|---|
 | Slab Corridor | One sky bridge fully lit, nobody in it |
+| Office Park | One dark building that switches on floor by floor as you come near, and off after you leave: a motion sensor |
 | Boulevard | A single window high up that goes out while you look at it |
+| Never Lived In | The show flat: one lit ground-floor home with a table set for two, and nobody in it |
 | Plaza | A lone lamp, a bench, and a statue's long shadow across the square |
+| Field of Blocks | Another car two lanes over, keeping pace; its light slides behind the slabs, then it stops and goes dark |
 | Interchange | A lit, empty train crossing a high line ahead, then its horn |
 | Residential Wall | A figure crossing a lit window; below, a lit bus stop with nobody waiting |
 | Corner | A green-lit diner with one figure's back to you; a payphone ringing as you pass |
@@ -99,7 +106,8 @@ Codex and AGY, each built from the same palette.
 | `play.html` | Generated; gitignored. Edit the source and rebuild. |
 | `play-test.html` | Generated test copy that exposes internals as `window.__cn`; gitignored. |
 | `LONELY_CITY_BRIEF.md` | The design brief the city is built from. |
-| `DISTRICT_CONCEPTS.md` | Twelve further district ideas drawn from the research (not built yet). |
+| `DISTRICT_CONCEPTS.md` | Twelve district ideas drawn from the research. Three are built (see below); nine are not. |
+| `DISTRICTS_BATCH_1.md`, `wireframes/batch-1.html` | The build spec and approved layout drawings for Office Park, Never Lived In and Field of Blocks. |
 | `ships/SHIP_DESIGN_SPEC.md` | The brief and code contract for the spaceship designs. |
 | `ships/codex-ships.js`, `ships/agy-ships.js` | Three ships each by Codex and AGY, embedded in the game unchanged. |
 | `autotest.html` | Generated headless-test copy; gitignored. |

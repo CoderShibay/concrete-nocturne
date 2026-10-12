@@ -1132,7 +1132,21 @@ function officeLitMaterial() {
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso;
   return new THREE.MeshBasicMaterial({ map: t, color: OFFICE_LIT });
 }
-const OFFICE_LIT = 0xcfe3d2, PAVILION = new THREE.Color(0xd9c9a8).multiplyScalar(0.4).getHex(), FLOOD = 0xe6f2e2;
+// The stadium pitch, laid over the crossroads: floodlit grass with its white lines, added onto the road as light.
+function pitchMaterial() {
+  const W = 480, H = 320, c = mkCanvas(W, H), x = c.getContext('2d'), u = W / 60;   // 60 × 40 m
+  x.fillStyle = '#000'; x.fillRect(0, 0, W, H);
+  const g = x.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * 0.62); g.addColorStop(0, '#3f5a44'); g.addColorStop(0.7, '#2b4031'); g.addColorStop(1, '#0c130e');
+  x.fillStyle = g; x.fillRect(u, u, W - 2 * u, H - 2 * u);
+  x.strokeStyle = '#f2f6ee'; x.lineWidth = 3;
+  x.strokeRect(4 * u, 3 * u, W - 8 * u, H - 6 * u); x.beginPath(); x.moveTo(W / 2, 3 * u); x.lineTo(W / 2, H - 3 * u); x.stroke();
+  x.beginPath(); x.arc(W / 2, H / 2, 5.5 * u, 0, 7); x.stroke();
+  for (const e of [4 * u, W - 4 * u - 9 * u]) x.strokeRect(e, H / 2 - 10 * u, 9 * u, 20 * u);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = aniso;
+  return new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: PITCH, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+}
+const PITCH = 0.9, STAND_LIT = 0x566358;
+const OFFICE_LIT = 0xcfe3d2, FLOOD = 0xe6f2e2;
 const glowTex = radialTex('rgba(255,255,255,1)', 'rgba(255,255,255,0)');
 const glowMat = (color, opacity) => new THREE.MeshBasicMaterial({ map: glowTex, color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 
@@ -1156,15 +1170,15 @@ const mats = {
   glowv: glowMat(0x7fcf9a, 0.32),
   glowd: glowMat(0x8fe0a4, 0.6),
   beacon: new THREE.MeshBasicMaterial({ color: 0xff2040 }),
-  glassDark: new THREE.MeshStandardMaterial({ color: 0x0d1114, roughness: 0.15, metalness: 0.6 }),   // unlit glass
+  glassDark: new THREE.MeshStandardMaterial({ color: 0x0d1114, roughness: 0.55, metalness: 0.6 }),   // unlit glass
   panel: new THREE.MeshStandardMaterial({ color: 0x55585c, roughness: 0.7 }),
   officeLit: officeLitMaterial(),
   paint: new THREE.MeshStandardMaterial({ color: 0x8a8b8f, roughness: 0.8 }),                        // car-park lines, not lit
   glowf: glowMat(0xd6ecd0, 0.3),
   winDead: windowMaterial(0, 83, 0, '#4b4a45'),                                                       // no window ever lit
-  pavilion: new THREE.MeshBasicMaterial({ color: PAVILION }),                                         // the sales pavilion, lit inside
   flood: new THREE.MeshBasicMaterial({ color: FLOOD, fog: false }),                                   // stadium floodlights carry through the haze
-  glowp: glowMat(0xd6ecd0, 0.12),
+  glowp: pitchMaterial(),
+  standlit: new THREE.MeshBasicMaterial({ color: STAND_LIT }),                                        // the faces of the stands that look at the pitch
   room: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd49a).multiplyScalar(0.5) }),          // the show flat's lit wall, dim enough to read the furniture against
   furn: new THREE.MeshBasicMaterial({ color: 0x21170f }),                                             // show-flat furniture, seen against the light
   shade: new THREE.MeshBasicMaterial({ color: 0xfff0cf }),
@@ -1302,7 +1316,7 @@ function flush(bk, grp, geos) {
 }
 
 /* ---------- director: decides what each new district becomes ---------- */
-// The city stays endless. Each 3×3-block district gets one zone the first time it comes into range,
+// The city stays endless. Each 12×12-block district gets one zone the first time it comes into range,
 // following the drive's order (sameness → scale → exposure → people you can't reach → fading out).
 const ZONES = ['corridor', 'office', 'boulevard', 'newtown', 'plaza', 'field', 'interchange', 'residential', 'corner', 'fog'];
 const ZONE_NAMES = {
@@ -1544,11 +1558,15 @@ function genCell(i, j) {
         addBox(bk, key, top, bx - ax, y1 - y0, bz - az, (ax + bx) / 2, ph + (y0 + y1) / 2, (az + bz) / 2);
         if (solid) solids.push({ x0: ax, x1: bx, z0: az, z1: bz, y0, y1: ph + y1 });
       };
-      [6, 11, 16].forEach((hh, k) => { put('concrete', 'concrete', 19, 41 + 8 * k, 22 + 8 * k, 30 + 8 * k, 0, hh); put('concrete', 'concrete', 33 + 8 * k, 41 + 8 * k, 19, 22 + 8 * k, 0, hh); });
+      [6, 11, 16].forEach((hh, k, hs) => {
+        put('concrete', 'concrete', 19, 41 + 8 * k, 22 + 8 * k, 30 + 8 * k, 0, hh); put('concrete', 'concrete', 33 + 8 * k, 41 + 8 * k, 19, 22 + 8 * k, 0, hh);
+        const y0 = k ? hs[k - 1] : 0;                                           // each riser faces the pitch and catches the floodlights
+        put('standlit', 'standlit', 19, 33 + 8 * k, 21.9 + 8 * k, 22 + 8 * k, y0, hh, false); put('standlit', 'standlit', 32.9 + 8 * k, 33 + 8 * k, 19, 22 + 8 * k, y0, hh, false);
+      });
       put('pole', 'pole', 59.4, 60.6, 48.4, 49.6, 0, 38);                      // floodlight mast, lit for nobody
       put('flood', 'flood', 57, 63, 48.6, 49.4, 36.5, 39.5, false);
       const halo = new THREE.Sprite(floodHalo); halo.scale.set(26, 26, 1); halo.position.set(cx + sx * 60, ph + 38, cz + sz * 49); grp.add(halo);
-      if (li === 7 && lj === 7) addQuad(bk, 'glowp', cx, cz, 50, 30, 0.05);    // the pitch
+      if (li === 7 && lj === 7) addQuad(bk, 'glowp', cx, cz, 60, 40, 0.05);    // the pitch
     } else {
       for (let q = 40; q < 96; q += 9) for (const [x, z] of [[q, 35.5], [35.5, q]]) {   // saplings in planters, each tied to a stake
         addBox(bk, 'concrete', 'concrete', 1.2, 0.5, 1.2, x, ph + 0.25, z); addBox(bk, 'pole', 'pole', 0.06, 2.4, 0.06, x, ph + 1.7, z);
@@ -1564,8 +1582,18 @@ function genCell(i, j) {
         }
         if (kind === 'sales') {                                                 // a lit glass sales pavilion under a flat roof
           const [x, z] = P(65, 47), w = rot ? 12 : 22, d = rot ? 22 : 12;
-          addBox(bk, 'pavilion', 'roof', w, 4.6, d, x, ph + 2.3, z); addBox(bk, 'roof', 'roof', w + 3, 0.4, d + 3, x, ph + 4.8, z);
-          for (let q = -11; q <= 11; q += 4.4) for (const e of [-6.05, 6.05]) { const [mx, mz] = P(65 + q, 47 + e); addBox(bk, 'pole', 'pole', 0.12, 4.6, 0.12, mx, ph + 2.3, mz); }
+          // a box measured along the pavilion's long side (a) and its short side (b), from its centre
+          const pv = (key, a, b, wa, wb, hh, y) => { const [bx, bz] = P(65 + a, 47 + b); addBox(bk, key, key === 'room' ? 'roof' : key, rot ? wb : wa, hh, rot ? wa : wb, bx, ph + y, bz); };
+          pv('room', 0, 0, 20.8, 10.8, 3.9, 2.25);                              // the lit wall, set back behind the glass line
+          pv('roof', 0, 0, 22, 12, 0.3, 0.15); pv('roof', 0, 0, 22, 12, 0.4, 4.4); addBox(bk, 'roof', 'roof', w + 3, 0.4, d + 3, x, ph + 4.8, z);   // sill, head, flat roof
+          for (let q = -11; q <= 11; q += 4.4) for (const e of [-5.95, 5.95]) pv('pole', q, e, 0.14, 0.14, 4.6, 2.3);       // window frames
+          for (let q = -6; q <= 6; q += 4) for (const e of [-10.95, 10.95]) pv('pole', e, q, 0.14, 0.14, 4.6, 2.3);
+          for (const e of [-5.7, 5.7]) {                                        // along both long sides: a desk and chair, the model of the estate, a poster
+            pv('furn', -7.2, e, 2.0, 0.5, 0.75, 0.675); pv('furn', -5.4, e, 0.45, 0.45, 0.9, 0.75); pv('furn', -8.9, e, 0.45, 0.45, 0.9, 0.75);
+            pv('furn', 0.3, e, 3.2, 0.5, 0.8, 0.7); for (const t of [-0.6, 0.2, 1.0]) pv('furn', t + 0.3, e, 0.3, 0.3, 1.0 + (t + 0.6) * 0.35, 1.6 + (t + 0.6) * 0.175);
+            pv('furn', 6.6, e, 0.07, 0.07, 1.7, 1.15); pv('furn', 6.6, e, 1.3, 0.06, 0.9, 2.2); pv('shade', 3.4, e, 0.35, 0.35, 0.3, 3.9);
+          }
+          for (const e of [-10.7, 10.7]) { pv('furn', e, 0, 0.5, 2.4, 0.75, 0.675); pv('furn', e, 3.4, 0.06, 0.06, 1.6, 1.1); pv('shade', e, 3.4, 0.35, 0.35, 0.35, 2.0); }   // a sofa and a lamp at each end
           solids.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, y0: 0, y1: ph + 5 });
         }
         // the sign pylon at the road corner: the only signs here
@@ -1603,7 +1631,7 @@ function genCell(i, j) {
       const top = Math.max(FIELD.edge, FIELD.edge + FIELD.rise * fieldIn((x0 + x1) / 2, (z0 + z1) / 2) * w + (rnd() - 0.5) * 0.5);   // above road level
       const base = Math.min(gnd(x0, z0), gnd(x1, z0), gnd(x0, z1), gnd(x1, z1));                                                  // it stands on the sunken ground
       // about three slabs in ten stay upright; the rest lean a little. The collision box stays upright.
-      const [tx, tz] = rnd() < 0.3 ? [0, 0] : fieldLean(f, (li * C + x0 + x1) / 2, (lj * C + z0 + z1) / 2);
+      const [tx, tz] = rnd() < 0.3 ? [0, 0] : fieldLean(f, li * C + (x0 + x1) / 2, lj * C + (z0 + z1) / 2);
       addSlab(bk, 'stele', x0, x1, z0, z1, base, top, tx * (top - base), tz * (top - base));
       solids.push({ x0, x1, z0, z1, y0: base, y1: top });
     }
@@ -2018,15 +2046,17 @@ function makePacer(alongZ, s) {
         if (run > runFor) state = 'stop';
       } else {
         sp = Math.max(0, sp - 22 * dt); if (sp === 0) still += dt;
-        if (still > 1.5) { g.visible = false; return 'used'; }                    // its lights go out
+        if (still > 1.5) { g.visible = false; pacerLight.intensity = 0; return 'used'; }   // its lights go out
       }
       along += s * sp * dt;
       if (alongZ) pos.set(cross, 0, along); else pos.set(along, 0, cross);
       const dx = alongZ ? 0 : s * 2, dz = alongZ ? s * 2 : 0;                    // it follows the ground down, as you do
       pos.y = groundAt(pos.x, pos.z); g.position.copy(pos);
+      pacerLight.position.set(pos.x + dx * 2, pos.y + 1.1, pos.z + dz * 2);     // the slabs around it glow as it moves: that glow sliding behind the rows is what you see
+      pacerLight.intensity = state === 'wait' || dayMode ? 0 : 2.4 * (1 - clamp(still / 1.5, 0, 1));
       g.rotation.x = Math.atan((groundAt(pos.x + dx, pos.z + dz) - groundAt(pos.x - dx, pos.z - dz)) / 4);
     },
-    dispose() { scene.remove(g); white.dispose(); body.dispose(); halo.dispose(); lg.dispose(); bg.dispose(); pg.dispose(); pm.dispose(); },
+    dispose() { pacerLight.intensity = 0; scene.remove(g); white.dispose(); body.dispose(); halo.dispose(); lg.dispose(); bg.dispose(); pg.dispose(); pm.dispose(); },
   };
 }
 function makeTrain(alongZ, s, ti, tj) {
@@ -2173,8 +2203,12 @@ ground.rotation.x = -Math.PI / 2; scene.add(ground);
 /* ---------- car ---------- */
 const car = { alt: 0, vy: 0, boost: 1, boosting: 0, pos: new THREE.Vector3(C + R / 2 + 3, 0, (DS - 1) * C + 40), heading: 0, speed: 0, vel: new THREE.Vector3(), steer: 0, bump: 0, drift: 0 };
 const carMesh = new THREE.Group(); scene.add(carMesh);
+// Two small lights that are always in the scene and normally off (adding a light later would stall the frame):
+// your own light spilling onto the slabs beside you in the Field of Blocks, and the other car's light there.
+const fieldGlow = new THREE.PointLight(0xfff0d6, 0, 15, 1.4), pacerLight = new THREE.PointLight(0xfff1d6, 0, 24, 1.3);
+scene.add(fieldGlow, pacerLight);
 const frontWheels = [], flames = [], wheelRings = [];
-const HEADLIGHT = 1.2;                    // the saloon's headlight at night
+const HEADLIGHT = 2.2;                    // the saloon's headlight at night
 let boostLight = null, headlight = null;
 // place a thin bar between two points (car-local)
 function barBetween(parent, a, b, mat, t = 0.05) {
@@ -2229,7 +2263,7 @@ function profileGeo(pts, width, bevel = 0.05) {
   }
   add(new THREE.CylinderGeometry(0.035, 0.035, 0.3, 8).rotateX(Math.PI / 2), black, -0.5, 0.26, 2.3);   // exhaust pipe
   // lights: one real headlight down the road (on at night, off by day), a warm cabin, red on the wet tarmac behind
-  const head = headlight = new THREE.SpotLight(0xfff0d6, HEADLIGHT, 70, 0.5, 0.6, 1.1); head.position.set(0, 0.64, -2.3);
+  const head = headlight = new THREE.SpotLight(0xfff0d6, HEADLIGHT, 90, 0.5, 0.6, 1.1); head.position.set(0, 0.64, -2.3);
   head.target.position.set(0, 0, -22); carMesh.add(head); carMesh.add(head.target);
   const tail = new THREE.PointLight(0xff2a1e, 0.8, 7, 2); tail.position.set(0, 0.7, 2.9); carMesh.add(tail);
   // booster: a short orange flame from the exhaust
@@ -2931,8 +2965,9 @@ function setDay(d) {
   mats.lamp.color.setHex(L.lamp); mats.lampv.color.setHex(L.lampv);
   headlight.intensity = d ? 0 : HEADLIGHT;
   mats.officeLit.color.setHex(d ? 0x39403c : OFFICE_LIT);          // by day the office lights don't show through the glass
-  for (const k of ['glow', 'glowv', 'glowc', 'glowd', 'glowf', 'glowp']) mats[k].visible = !d;
-  mats.pavilion.color.setHex(d ? 0x4a4640 : PAVILION); mats.flood.color.setHex(d ? 0x9a9c98 : FLOOD); floodHalo.visible = !d;   // no light pools on the road in daylight
+  for (const k of ['glow', 'glowv', 'glowc', 'glowd', 'glowf']) mats[k].visible = !d;
+  mats.glowp.opacity = d ? 0.3 : PITCH; mats.standlit.color.setHex(d ? 0x5c5e5d : STAND_LIT);   // by day the pitch is only its lines, the stands plain concrete
+  mats.flood.color.setHex(d ? 0x9a9c98 : FLOOD); floodHalo.visible = !d;   // no light pools on the road in daylight
   if (bloom) bloom.threshold = L.bloomT;
   ground.material.color.setHex(d ? 0x8c8c8c : 0xffffff);          // tame the asphalt speckle in full daylight
   for (const obj of [carMesh, shipMesh]) obj.traverse(m => {     // the warm dash glow is for the night; by day the glass is just glass
@@ -3026,7 +3061,7 @@ function followGround(dt) {
   const sr = onGround ? (groundAt(px - fz * 0.9, pz + fx * 0.9) - groundAt(px + fz * 0.9, pz - fx * 0.9)) / 1.8 : 0;
   const k = 1 - Math.exp(-dt / 0.25);
   car.gPitch += (Math.atan(sf) - car.gPitch) * k; car.gRoll += (Math.atan(sr) - car.gRoll) * k;
-  camGy += (car.gy - camGy) * (1 - Math.exp(-dt / 0.4));       // the camera keeps its height above the car, without bobbing
+  camGy += (car.gy - camGy) * (1 - Math.exp(-dt / 0.2));       // the camera keeps its height above the car, without bobbing
 }
 let camGy = 0;
 const torque = rpm => 0.72 + 0.28 * Math.sin(clamp((rpm - 1000) / 5600, 0, 1) * Math.PI);
@@ -3325,6 +3360,7 @@ function frame() {
   carMesh.visible = vehicle === 'car'; boardMesh.visible = vehicle === 'board'; shipMesh.visible = vehicle === 'ship';
   followGround(dt);
   carMesh.position.y = car.gy + car.heave;
+  fieldGlow.position.set(car.pos.x, car.gy + 1.5, car.pos.z); fieldGlow.intensity = dayMode ? 0 : 1.3 * wallDepth;
   carMesh.rotation.set(0, car.heading, 0);
   carMesh.rotateX(car.pitch + car.gPitch); carMesh.rotateZ(car.roll + car.gRoll);
   if (vehicle === 'board') {
