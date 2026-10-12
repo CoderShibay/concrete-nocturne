@@ -6,7 +6,13 @@ Written by the design agent for the build session, against commit `cd188bb` (202
 Concepts and research sources: `DISTRICT_CONCEPTS.md` (#5, #8, #2). Rules: `LONELY_CITY_BRIEF.md`.
 Wireframes: `wireframes/batch-2.html`.
 
-> **Status: WIREFRAMES — awaiting Ali's approval.** Items marked **[DECISION]** are open.
+> **Status: APPROVED by Ali on 2026-10-12. Ready to build.** The wireframes and the four decisions below are final.
+>
+> **Decisions:**
+> 1. Coming Soon: demolition in **three bands** across the district.
+> 2. Density Wall: blocks **fill the whole lot**.
+> 3. Density Wall: windows **stay mostly lit all night**.
+> 4. The Port: **include** the dock basin and ship.
 
 ---
 
@@ -60,7 +66,7 @@ The demolition moves across the district in one direction, picked per district b
  one lot    TOWER     the finished glass tower, in the cleared part (row 9, column 6)
 ```
 
-**[DECISION 1]** this gradient (recommended), or the three kinds of lot mixed at random across the district.
+**Decided:** the three bands, as drawn.
 
 ### The three kinds of lot
 
@@ -166,14 +172,14 @@ A hollow block that fills the whole 62 m lot, with no apron.
 - **Four wings**, each 13 m deep, around a 36 × 36 m courtyard (47→83).
 - **Height:** 190 + `zr()`·50 m, one height per district.
 - **Gate:** a 9 m wide × 7 m high opening through the wing facing the x-road (x 60.5–69.5), on lots where `(li + lj) % 2 === 0`. You can drive into those courtyards. The other blocks are sealed.
-- **[DECISION 2]** blocks fill the lot as drawn (recommended; the street becomes a 38 m canyon), or keep the usual 7 m drivable apron (the canyon is 52 m and the blocks are smaller).
+- **Decided:** blocks fill the lot as drawn. The street becomes a 38 m canyon, and sealed blocks can't be driven onto.
 
 ### Build list (`genCell`, zone `density`)
 | Element | Detail | Material |
 |---|---|---|
 | Wings | 4 boxes (the gated wing is two boxes plus a lintel above the gate) | new `winDense` |
 | `winDense` texture | same 24 × 51.2 m tile, but 12 columns × 16 rows (windows 2 m apart). Painted into the texture:<br>- an air-conditioner box under about 40% of windows<br>- a laundry strip (3–4 small coloured rectangles) under about 15%<br>- a plant on about 10% | `windowMaterial` variant with `litAmt = 0.75` |
-| Lit windows | **[DECISION 3]** they stay mostly lit all night (recommended): the zone uses its own uniform, `max(0.55, litFraction)`, so about half the windows are still on at 04:00. Or they go dark like every other zone. | |
+| Lit windows | **Decided:** they stay mostly lit all night. The zone uses its own uniform, `max(0.55, litFraction)`, so about half the windows are still on at 04:00. | |
 | Street clutter | on the road faces, from 3 to 12 m up:<br>- balcony cages (1.6 × 1.1 × 0.6 m boxes, `pole`) on about 1 window in 6<br>- 3 vertical pipes per face (`pole`) | |
 | Ground floor | rolled-down shutters: a 4 m `dark` band with thin `pole` lines every 3 m. No signs, no neon. | |
 | Courtyard | paving, plus:<br>- one working lamp<br>- one dead lamp<br>- 4 parked cars<br>- a row of bins (0.8 m cubes) | existing |
@@ -254,7 +260,7 @@ The same television in a hundred rooms.
 | Water | a flat plane at **−1.5 m**, filling the lot inside a 2 m quay edge (36→94), `glassDark`. The world ground is cut away with the batch 1 `HOLES` mask. |
 | Quay edge | a 0.9 m kerb around the basin, **solid**: the car cannot drive in. Mooring bollards every 8 m. |
 | Ship | - hull 50 × 12 m, top 8 m above the water, `dark`<br>- at the stern, a superstructure 10 × 12 × 12 m with **six lit windows** (`room`)<br>- a string of 8 deck lights (`lamp`)<br>- a `beacon` at the masthead |
-| **[DECISION 4]** | include the basin and ship (recommended: it is the only water in the city), or leave it out and keep every lot as stacks |
+| Decided | the basin and ship are included. It is the only water in the city. |
 
 - **Collision:** container columns, crane legs, masts, the quay kerb and the ship are solid. The aisle and the gaps are open: the car fits the 5.7 m gaps (it needs 3.4 m).
 - **Lamps:** street `lampOn = 0.8`, `sodium = true`.
