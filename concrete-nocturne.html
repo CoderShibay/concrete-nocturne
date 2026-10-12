@@ -1014,7 +1014,7 @@ const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.4, 18
 
 const hemi = new THREE.HemisphereLight(0x4d5c78, 0x0d0b09, 0.7); scene.add(hemi);
 let flash = 0, flashQueue = [], nextThunder = 18, nextDistant = 35, fogMix = 0, nextWipe = 0, wallDepth = 0, nextClank = 0;
-const zoneMix = { newtown: 0, port: 0, density: 0, court: 0 };   // court: inside one of Density Wall's courtyards   // how far into each of these districts' own sound you are, 0 to 1
+const zoneMix = { newtown: 0, port: 0, density: 0, soon: 0, court: 0 };   // court: inside one of Density Wall's courtyards   // how far into each of these districts' own sound you are, 0 to 1
 const moonLight = new THREE.DirectionalLight(0x9aa8ff, 0.35);
 moonLight.position.set(-0.4, 1, -0.6); scene.add(moonLight);
 
@@ -1214,6 +1214,7 @@ const mats = {
   glowf: glowMat(0xd6ecd0, 0.3),
   winDense: windowMaterial(4, 97, 0.75),                                                             // Density Wall: most windows lit
   shutter: new THREE.MeshStandardMaterial({ color: 0x16171a, roughness: 0.7 }),                       // its ground floor: rolled-down shutters
+  winOld: windowMaterial(0, 113, 0.3, '#3a352f', false),                                             // Coming Soon: old brown terraces, a few windows still lit
   winDead: windowMaterial(0, 83, 0, '#4b4a45'),                                                       // no window ever lit
   flood: new THREE.MeshBasicMaterial({ color: FLOOD, fog: false }),                                   // stadium floodlights carry through the haze
   glowp: pitchMaterial(),
@@ -1230,8 +1231,8 @@ const mats = {
 };
 const floodHalo = new THREE.SpriteMaterial({ map: glowTex, color: 0xd6ecd0, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
 NEON.forEach((c, k) => { mats['neon' + k] = new THREE.MeshBasicMaterial({ color: c }); });
-const UV = { concrete: [16, 16], officeLit: [8, 2.4], box0: [2.4, 2.59], box1: [2.4, 2.59], box2: [2.4, 2.59], box3: [2.4, 2.59], box4: [2.4, 2.59] };
-const uvFor = k => k.startsWith('win') ? [TEX_W, TEX_H] : (UV[k] || [4, 4]);
+const UV = { concrete: [16, 16], officeLit: [8, 2.4], box0: [2.4, 2.59], box1: [2.4, 2.59], box2: [2.4, 2.59], box3: [2.4, 2.59], box4: [2.4, 2.59], winOld: [TEX_W, 54.4] };   // winOld: 3.4 m floors
+const uvFor = k => UV[k] || (k.startsWith('win') ? [TEX_W, TEX_H] : [4, 4]);
 
 /* ---------- neon sign textures ---------- */
 const V_SIGNS = ['夜市', '無限', '電脳', '酒場', 'ホテル', 'ラーメン', '喫茶', '静寂'];
@@ -1374,6 +1375,7 @@ const ZONE_NAMES = {
   corner: ['The All-Night Corner', 'Where the Diner Was', 'Last Counter', 'Payphone Street'],
   fog: ['Where It Thins Out', 'The Last Lamps', 'Low Tide', 'Edge of the Grid'],
   density: ['No Horizon', 'Ten Thousand Windows', 'Monster Block', 'The Inner Courtyard'],
+  soon: ['The Last Terrace', 'Hoarding Street', 'Coming Soon', 'Where Number 9 Was'],
   port: ['Terminal Four', 'Stack Yard', 'The Gantries', 'Berth 9'],
 };
 const director = { distanceDriven: 0, driveTime: 0, sinceLastMoment: 0, nextGap: 25, litFraction: 1, musicDensity: 1 };
@@ -1461,6 +1463,12 @@ function directorTick(dt) {
   director.musicDensity = director.litFraction;
 }
 
+// Coming Soon: an old low-rise neighbourhood being demolished street by street. The demolition crosses the district in
+// one direction: four rows where people still live, four rows cut open, four rows cleared, and the finished tower.
+function soonKind(di, dj, li, lj) {
+  const flip = mulberry(hash2(di, dj, 31))() < 0.5, row = flip ? li : lj, col = flip ? lj : li;
+  return row === 9 && col === 6 ? 'tower' : row < 4 ? 'intact' : row < 8 ? 'cut' : 'cleared';
+}
 // 0 → len → 0 at speed v, waiting `pause` seconds at each end
 function pingPong(t, len, v, pause) {
   const run = len / v, per = 2 * (run + pause), q = ((t % per) + per) % per;
@@ -1738,6 +1746,27 @@ function genCell(i, j) {
       solids.push({ x0, x1, z0, z1, y0: base, y1: top });
     }
     lampOn = 0.5; sodium = true;
+  } else if (zone === 'soon') {
+    // Coming Soon: the only human-scale buildings in the city (four storeys), and the only place with a past.
+    plinth(FLAT);
+    const kind = soonKind(di, dj, li, lj), TH = 13.6;                           // 4 floors of 3.4 m, plus a 0.8 m parapet = 14.4 m
+    const terrace = (z0, x0 = 41, x1 = 89) => {                                // one row of old houses, 11 m deep
+      addBox(bk, 'winOld', 'roof', x1 - x0, TH, 11, (x0 + x1) / 2, ph + TH / 2, z0 + 5.5, same);
+      facades.push({ x0, x1, z0, z1: z0 + 11, y0: ph, y1: ph + TH + 0.8 });
+    };
+    const parapet = z0 => addBox(bk, 'concrete', 'concrete', 48.4, 0.8, 11.4, 65, ph + TH + 0.4, z0 + 5.5);
+    if (kind === 'intact') {
+      for (const [z0, doorZ] of [[41, 40.96], [78, 89.04]]) {                  // two terraces, eight front doors each, facing their own street
+        terrace(z0); parapet(z0);
+        for (let k = 0; k < 8; k++) addBox(bk, 'dark', 'dark', 1, 2.1, 0.06, 44 + 6 * k, ph + 1.05, doorZ);
+      }
+      for (const sx of [48, 65, 82]) {                                          // the back yards between them: sheds and a washing line
+        addBox(bk, 'concrete', 'roof', 4, 2.4, 3, sx, ph + 1.2, 76.5); solids.push({ x0: sx - 2, x1: sx + 2, z0: 75, z1: 78, y0: 0, y1: 2.4 });
+      }
+      for (const px of [56, 74]) addBox(bk, 'pole', 'pole', 0.08, 2.2, 0.08, px, ph + 1.1, 63);
+      addBox(bk, 'pole', 'pole', 18, 0.03, 0.03, 65, ph + 2.1, 63);
+    }
+    lampOn = 0.4; sodium = true;                                                // old lamps; many dead
   } else if (zone === 'density') {
     // Density Wall: a hollow block that fills the whole lot, so tall and so tightly packed that the sky is a strip.
     // Most windows are lit: the one district that is full of people, none of them reachable.
@@ -2859,6 +2888,12 @@ const radio = {
     this.acG = ctx.createGain(); this.acG.gain.value = 0; this.acG.connect(comp);
     { const o = ctx.createOscillator(); o.frequency.value = 120; o.connect(this.acG); o.start(); }
 
+    // Coming Soon: wind through the opened buildings, slowly swelling
+    this.windG = ctx.createGain(); this.windG.gain.value = 0; this.windG.connect(comp);
+    { const src = ctx.createBufferSource(), bq = ctx.createBiquadFilter(), sw = ctx.createGain(), l = ctx.createOscillator(), lg = ctx.createGain();
+      src.buffer = nb; src.loop = true; bq.type = 'bandpass'; bq.frequency.value = 400; bq.Q.value = 0.9; sw.gain.value = 0.6; l.frequency.value = 0.09; lg.gain.value = 0.4;
+      l.connect(lg); lg.connect(sw.gain); src.connect(bq); bq.connect(sw); sw.connect(this.windG); src.start(0, Math.random()); l.start(); }
+
     this.full = true;   // rain, engine, hover hum and the rest are all in place
   },
   mtof: n => 440 * Math.pow(2, (n - 69) / 12),
@@ -3130,7 +3165,7 @@ const radio = {
     this.duck.gain.setTargetAtTime((1 - 0.5 * depth) * (1 - 0.3 * zm.port), t, 0.15);          // in the Port something is always louder than the radio
     if (!this.full) return;
     this.rainDuck.gain.setTargetAtTime(1 - 0.6 * depth, t, 0.15);
-    this.portG.gain.setTargetAtTime(0.02 * zm.port, t, 0.15);
+    this.portG.gain.setTargetAtTime(0.02 * zm.port, t, 0.15); this.windG.gain.setTargetAtTime(0.02 * zm.soon, t, 0.15);   // 0.02 × a swell of 0.2 to 1 averages the 0.012 asked for
     this.densG.gain.setTargetAtTime((0.02 + 0.015 * zm.court) * zm.density, t, 0.15); this.rainDuck.gain.setTargetAtTime((1 - 0.6 * depth) * (1 - 0.3 * zm.court), t, 0.15);   // in a courtyard the murmur closes in and the rain backs off
     this.acG.gain.setTargetAtTime(0.01 * zm.density, t, 0.15);
   },
@@ -3522,7 +3557,7 @@ function updateHud(elapsed) {
 
 /* ---------- map ---------- */
 // Blocks tinted by zone, your route as a faint sodium line. Moments are never shown: they stay surprises.
-const ZONE_TINT = { port: '#33393f', density: '#3d3a36', corridor: '#33363d', office: '#2f3338', boulevard: '#3c3933', newtown: '#2e3336', plaza: '#24272b', field: '#26282b', interchange: '#383742', residential: '#3a3632', corner: '#4b3d2b', fog: '#20242b' };
+const ZONE_TINT = { soon: '#3a342c', port: '#33393f', density: '#3d3a36', corridor: '#33363d', office: '#2f3338', boulevard: '#3c3933', newtown: '#2e3336', plaza: '#24272b', field: '#26282b', interchange: '#383742', residential: '#3a3632', corner: '#4b3d2b', fog: '#20242b' };
 const route = [], visitedDistricts = new Map();
 function mapRecord() {
   const last = route[route.length - 1];
