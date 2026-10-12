@@ -1061,9 +1061,10 @@ function radialTex(inner, outer, size = 128) {
 // and a shader turns it off once the director's litFraction drops below it. Lower floors go dark first.
 const NIGHT = { value: 1 };
 // Density Wall keeps its own count: its windows stay mostly lit all night (NIGHT_DENSE never falls below 0.55).
-// TV is one shared level for the televisions in its windows, so every facade in view flickers in unison.
+// Its low floors don't go dark first, as they do elsewhere. TV is one shared level for the televisions in its windows, so every facade in view flickers in unison.
 const NIGHT_DENSE = { value: 1 }, TV = { value: 0 };
 function nightWindows(mat, offTex, lit = NIGHT, tvTex = null) {
+  mat.customProgramCacheKey = () => 'nightWindows' + (tvTex ? '-tv' : '');   // the two variants compile to different shaders and must not share one
   mat.onBeforeCompile = sh => {
     sh.uniforms.uLit = lit; sh.uniforms.tOff = { value: offTex };
     if (tvTex) { sh.uniforms.uTV = TV; sh.uniforms.tTV = { value: tvTex }; }
@@ -1071,7 +1072,7 @@ function nightWindows(mat, offTex, lit = NIGHT, tvTex = null) {
     sh.fragmentShader = 'uniform float uLit;\nuniform sampler2D tOff;\nuniform float uTV;\nuniform sampler2D tTV;\nvarying float vWY;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `
       vec4 emissiveColor = texture2D( emissiveMap, vUv );
       emissiveColor.rgb = emissiveMapTexelToLinear( emissiveColor ).rgb;
-      float offAt = texture2D( tOff, vUv ).r + ( 1.0 - smoothstep( 12.0, 150.0, vWY ) ) * 0.35;
+      float offAt = texture2D( tOff, vUv ).r + ( 1.0 - smoothstep( 12.0, 150.0, vWY ) ) * ${tvTex ? '0.0' : '0.35'};
       totalEmissiveRadiance *= emissiveColor.rgb * step( offAt, uLit );` + (tvTex ? `
       totalEmissiveRadiance += vec3( 0.45, 0.6, 1.0 ) * texture2D( tTV, vUv ).r * uTV;` : ''));
   };
