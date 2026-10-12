@@ -1187,6 +1187,8 @@ const OFFICE_LIT = 0xcfe3d2, FLOOD = 0xe6f2e2;
 const glowTex = radialTex('rgba(255,255,255,1)', 'rgba(255,255,255,0)');
 const glowMat = (color, opacity) => new THREE.MeshBasicMaterial({ map: glowTex, color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 
+// Coming Soon: the wallpapers of rooms cut open to the weather, at night brightness: ochre, sage, dusty pink, pale blue, cream, brown
+const PAPERS = [0x3d3524, 0x2c3a30, 0x3d2b2c, 0x27323d, 0x3a372e, 0x2e241c];
 const mats = {
   win0: windowMaterial(0, 11), win1: windowMaterial(1, 23), win2: windowMaterial(2, 37), win3: windowMaterial(3, 51), win4: windowMaterial(0, 67, 0.06),
   vend: new THREE.MeshBasicMaterial({ color: 0xa8e4ff }),
@@ -1231,6 +1233,7 @@ const mats = {
 };
 const floodHalo = new THREE.SpriteMaterial({ map: glowTex, color: 0xd6ecd0, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
 NEON.forEach((c, k) => { mats['neon' + k] = new THREE.MeshBasicMaterial({ color: c }); });
+PAPERS.forEach((c, k) => { mats['paper' + k] = new THREE.MeshBasicMaterial({ color: c }); });
 const UV = { concrete: [16, 16], officeLit: [8, 2.4], box0: [2.4, 2.59], box1: [2.4, 2.59], box2: [2.4, 2.59], box3: [2.4, 2.59], box4: [2.4, 2.59], winOld: [TEX_W, 54.4] };   // winOld: 3.4 m floors
 const uvFor = k => UV[k] || (k.startsWith('win') ? [TEX_W, TEX_H] : [4, 4]);
 
@@ -1765,6 +1768,31 @@ function genCell(i, j) {
       }
       for (const px of [56, 74]) addBox(bk, 'pole', 'pole', 0.08, 2.2, 0.08, px, ph + 1.1, 63);
       addBox(bk, 'pole', 'pole', 18, 0.03, 0.03, 65, ph + 2.1, 63);
+    }
+    const rubble = (x0, x1, z0, z1, n, hmax) => {                               // what is left of a house
+      for (let k = 0; k < n; k++) {
+        const w = 2 + rnd() * 4, d = Math.min(1.5 + rnd() * 3, z1 - z0), hh = 0.5 + rnd() * (hmax - 0.5), x = x0 + w / 2 + rnd() * (x1 - x0 - w), z = z0 + d / 2 + rnd() * (z1 - z0 - d);
+        addBox(bk, 'concrete', 'concrete', w, hh, d, x, ph + hh / 2, z, rnd); solids.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, y0: 0, y1: hh });
+      }
+    };
+    if (kind === 'cut') {
+      // one terrace still stands, with its road-facing wall gone for 30 m: five rooms on each of four floors, open to the street
+      terrace(41, 71, 89); parapet(41);
+      addBox(bk, 'winOld', 'roof', 30, TH, 7, 56, ph + TH / 2, 48.5, same); facades.push({ x0: 41, x1: 71, z0: 45, z1: 52, y0: ph, y1: ph + TH + 0.8 });
+      solids.push({ x0: 41, x1: 71, z0: 41, z1: 45, y0: 0, y1: ph + TH });
+      for (let f = 0; f < 4; f++) addBox(bk, 'concrete', 'concrete', 30, 0.25, 4, 56, ph + 3.4 * f + 0.125, 43);   // floor slabs
+      for (let k = 0; k < 5; k++) addBox(bk, 'concrete', 'concrete', 0.25, TH, 4, 41 + 6 * k + (k ? 0 : 0.125), ph + TH / 2, 43);   // party walls
+      for (let f = 0; f < 4; f++) for (let k = 0; k < 5; k++) {
+        const x0 = 41 + 6 * k, fy = ph + 3.4 * f + 0.25, paper = 'paper' + Math.floor(rnd() * PAPERS.length);
+        addBox(bk, paper, paper, 5.75, 3.15, 0.06, x0 + 3, fy + 1.575, 44.96);                                     // each room kept its own wallpaper
+        if (rnd() < 0.6) addBox(bk, 'dark', 'dark', 0.9, 2, 0.05, x0 + 4.85, fy + 1, 44.9);                        // a door
+        if (rnd() < 0.3) addBox(bk, 'pole', 'pole', 0.6, 0.45, 0.05, x0 + 1.85, fy + 1.9, 44.9);                   // a picture, still hanging
+        if (k === (2 * f + 1) % 5) for (let st = 0; st < 5; st++) addBox(bk, 'concrete', 'concrete', 0.5, 0.3 * (st + 1), 1, x0 + 0.7 + 0.5 * st, fy + 0.15 * (st + 1), 44.4);   // one stair run per floor
+      }
+      rubble(42, 88, 78, 89, 4 + Math.floor(rnd() * 3), 2.2);                   // where the other terrace stood
+      rubble(42, 70, 35.5, 39.5, 2 + Math.floor(rnd() * 2), 1.1);               // and a strip in front of the cut face
+      addBox(bk, 'pole', 'pole', 0.25, 8, 0.25, 38, ph + 4, 38); addBox(bk, 'fluo', 'fluo', 0.9, 0.3, 0.5, 38.3, ph + 8, 38.3);   // a site floodlight aimed at the open rooms
+      addFlat(bk, 'glowf', 54, 39, 22, ph + 0.04); solids.push({ x0: 37.7, x1: 38.3, z0: 37.7, z1: 38.3, y0: 0, y1: 8 });
     }
     lampOn = 0.4; sodium = true;                                                // old lamps; many dead
   } else if (zone === 'density') {
@@ -3241,6 +3269,7 @@ function setDay(d) {
   for (const k of ['glow', 'glowv', 'glowc', 'glowd', 'glowf', 'glowm']) mats[k].visible = !d;
   for (let k = 0; k < 5; k++) mats['box' + k].emissiveIntensity = d ? 0 : BOX_LIT;
   mats.glowp.opacity = d ? 0.3 : PITCH; mats.standlit.color.setHex(d ? 0x5c5e5d : STAND_LIT);   // by day the pitch is only its lines, the stands plain concrete
+  PAPERS.forEach((c, k) => mats['paper' + k].color.setHex(c).multiplyScalar(d ? 2.3 : 1));
   mats.flood.color.setHex(d ? 0x9a9c98 : FLOOD); floodHalo.visible = !d;   // no light pools on the road in daylight
   if (bloom) bloom.threshold = L.bloomT;
   ground.material.color.setHex(d ? 0x8c8c8c : 0xffffff);          // tame the asphalt speckle in full daylight
